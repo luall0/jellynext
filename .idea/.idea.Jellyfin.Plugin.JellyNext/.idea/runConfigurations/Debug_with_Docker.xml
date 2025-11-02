@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Debug with Docker" type="CompoundRunConfigurationType">
+    <toRun name="Build (Debug)" type="DotNetProject" />
+    <toRun name="Start Jellyfin Docker" type="ShConfigurationType" />
+    <method v="2" />
+  </configuration>
+</component>

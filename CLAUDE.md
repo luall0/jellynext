@@ -103,23 +103,31 @@ JellyNext is a Jellyfin plugin that integrates Trakt-powered discovery directly 
 ### Project Structure
 ```
 Jellyfin.Plugin.JellyNext/
-├── Configuration/           # Plugin config + web UI
-│   ├── PluginConfiguration.cs
-│   └── configPage.html      # Embedded admin UI
-├── Api/                     # REST endpoints (future)
-├── Services/                # Business logic (future)
-│   ├── TraktService         # Trakt API integration
-│   ├── ArrService           # Radarr/Sonarr integration
-│   ├── MetadataService      # TMDB enrichment
-│   └── VirtualLibrary       # Virtual item providers
-└── Plugin.cs                # Entry point
+├── Configuration/
+│   ├── PluginConfiguration.cs   # Global plugin settings
+│   └── configPage.html           # Admin web UI (OAuth + config)
+├── Api/
+│   └── TraktController.cs        # OAuth endpoints
+├── Services/
+│   └── TraktApi.cs               # Trakt API integration
+├── Models/
+│   ├── TraktUser.cs              # Per-user OAuth storage
+│   ├── TraktDeviceCode.cs        # OAuth device flow
+│   ├── TraktUserAccessToken.cs   # OAuth tokens
+│   └── TraktUserRefreshTokenRequest.cs
+├── Helpers/
+│   └── UserHelper.cs             # TraktUser lookup utility
+├── Plugin.cs                     # Entry point + polling tasks
+└── PluginServiceRegistrator.cs  # DI service registration
 ```
 
 ### Key Plugin Components
-- **Plugin.cs**: Main entry point, inherits `BasePlugin<PluginConfiguration>`
-- **PluginConfiguration**: Stores global settings (API keys, URLs, sync interval)
-- **IItemResolver** (future): Injects virtual items per-user into Jellyfin libraries
-- **plugin:// URLs**: Special paths for download interception (triggers Radarr/Sonarr)
+- **Plugin.cs**: Main entry point, inherits `BasePlugin<PluginConfiguration>`, tracks OAuth polling tasks
+- **PluginConfiguration**: Stores global settings (Radarr/Sonarr URLs/keys, TMDB key, sync interval, per-user TraktUser array)
+- **PluginServiceRegistrator**: Registers TraktApi and HttpClient in DI container
+- **TraktController**: REST endpoints for OAuth (authorize, deauthorize, status check)
+- **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls
+- **TraktUser**: Per-user OAuth tokens + preferences (stored in PluginConfiguration.TraktUsers array)
 
 ## Key Conventions
 
@@ -128,6 +136,23 @@ Jellyfin.Plugin.JellyNext/
 - Use XML documentation for public APIs (GenerateDocumentationFile enabled)
 - Enable nullable reference types
 - Embed web resources (HTML/JS) into assembly
+
+### HTTP Client Usage
+- **ALWAYS use `NamedClient.Default`** when creating HTTP clients: `_httpClientFactory.CreateClient(NamedClient.Default)`
+- This uses Jellyfin's preconfigured "happy eyeballs" HTTP client
+- Required for Trakt API to work (avoids Cloudflare blocks)
+- `NamedClient` from `MediaBrowser.Common.Net` namespace
+
+### Trakt API Headers
+- **Only two headers required**: `trakt-api-version: 2` and `trakt-api-key: {client_id}`
+- Do NOT add User-Agent or Accept headers (causes issues)
+- Base URL: `https://api.trakt.tv`
+- Endpoints: `/oauth/device/code`, `/oauth/device/token`, `/oauth/token`
+
+### Dependency Injection
+- Register services in `PluginServiceRegistrator.cs` implementing `IPluginServiceRegistrator`
+- Must register `AddHttpClient()` before services that use `IHttpClientFactory`
+- Services auto-discovered by Jellyfin on plugin load
 
 ### Per-User Architecture Pattern
 - Virtual libraries must be **filtered by current Jellyfin user**
@@ -159,19 +184,55 @@ Jellyfin.Plugin.JellyNext/
 - Cannot rely on Web UI-only features for core functionality
 - Optional: Web UI JavaScript injection for enhanced UX
 
+## Implemented Features
+
+### ✅ Per-User Trakt OAuth (Device Flow)
+**Architecture:**
+- Trakt Client ID/Secret embedded in `TraktApi.cs` (not in config)
+- Per-user OAuth tokens stored in `PluginConfiguration.TraktUsers[]` array
+- Each `TraktUser` has: `AccessToken`, `RefreshToken`, `LinkedMbUserId`, `AccessTokenExpiration`
+
+**OAuth Device Flow:**
+1. Admin selects Jellyfin user in plugin config page
+2. Click "Link Trakt Account" → `POST /JellyNext/Trakt/Users/{userGuid}/Authorize`
+3. Backend requests device code from Trakt API
+4. Frontend displays user code + trakt.tv/activate link
+5. Background polling task checks authorization every 3 seconds
+6. On success: stores access/refresh tokens in `TraktUser`, saves config
+7. Frontend auto-detects completion and shows success
+
+**Automatic Token Refresh:**
+- Tokens expire with 75% safety buffer (`ExpirationWithBuffer`)
+- `EnsureValidAccessToken()` checks expiration before every API call
+- `RefreshUserAccessToken()` exchanges refresh token for new access token
+- Trakt rotates refresh tokens on each refresh (new tokens saved automatically)
+
+**Key Methods:**
+- `TraktApi.AuthorizeDevice(traktUser)` - Initiates device flow
+- `TraktApi.PollForAccessToken(deviceCode, traktUser)` - Background polling
+- `TraktApi.RefreshUserAccessToken(traktUser)` - Token refresh
+- `TraktApi.CreateTraktClient(traktUser)` - Creates authenticated HTTP client with auto-refresh
+- `UserHelper.GetTraktUser(userGuid)` - Lookup TraktUser by Jellyfin user ID
+
+**API Endpoints:**
+- `POST /JellyNext/Trakt/Users/{userGuid}/Authorize` - Start OAuth
+- `GET /JellyNext/Trakt/Users/{userGuid}/AuthorizationStatus` - Check status
+- `POST /JellyNext/Trakt/Users/{userGuid}/Deauthorize` - Revoke access
+
 ## Core Workflows
 
 ### Initial Setup (Admin)
 1. Admin configures plugin via Jellyfin Dashboard
-2. Enter Trakt Client ID/Secret, TMDB API key
+2. Enter TMDB API key
 3. Enter Radarr/Sonarr URLs + API keys
 4. Set sync interval (default: 6 hours)
 
 ### User Trakt Linking (Per-User)
-1. User navigates to plugin settings in their Jellyfin account
-2. Initiates OAuth2 flow with Trakt
-3. Plugin stores OAuth token per-user (encrypted)
-4. Plugin begins syncing recommendations/new seasons for that user
+1. Admin opens plugin config → selects Jellyfin user from dropdown
+2. Clicks "Link Trakt Account" → receives user code
+3. User visits trakt.tv/activate and enters code
+4. Plugin auto-detects authorization completion
+5. Tokens stored in `PluginConfiguration.TraktUsers[]` for that user
 
 ### Virtual Library Display
 1. User opens "Trakt Recommendations" or "New Seasons" library
@@ -186,5 +247,19 @@ Jellyfin.Plugin.JellyNext/
 3. Parse TMDB ID from URL
 4. Call Radarr/Sonarr API to add media
 5. Show notification to user (download initiated)
+
+## Important Gotchas
+
+### Trakt API OAuth
+- **Cloudflare Protection**: Trakt API is behind Cloudflare - must use `NamedClient.Default` HTTP client
+- **No Custom Headers**: Only use `trakt-api-version` and `trakt-api-key` headers (User-Agent/Accept cause blocks)
+- **Token Safety Buffer**: Use 75% of token lifetime before refresh to prevent race conditions
+- **Refresh Token Rotation**: Trakt rotates refresh tokens on each refresh - always save new tokens
+- **Background Polling**: OAuth device flow polls in background - track with `Plugin.Instance.PollingTasks` dictionary
+
+### Configuration Access
+- Use `Plugin.Instance?.Configuration` not `Plugin.Instance?.PluginConfiguration`
+- `BasePlugin<T>` exposes config as `Configuration` property
+- `UserHelper.GetTraktUser(userGuid)` is the standard way to lookup per-user tokens
 
 ---

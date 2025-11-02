@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Jellyfin.Plugin.JellyNext.Models;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.JellyNext.Configuration;
@@ -7,16 +11,6 @@ namespace Jellyfin.Plugin.JellyNext.Configuration;
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {
-    /// <summary>
-    /// Gets or sets the Trakt Client ID.
-    /// </summary>
-    public string TraktClientId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Gets or sets the Trakt Client Secret.
-    /// </summary>
-    public string TraktClientSecret { get; set; } = string.Empty;
-
     /// <summary>
     /// Gets or sets the Radarr URL.
     /// </summary>
@@ -46,4 +40,45 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the TMDB API Key.
     /// </summary>
     public string TmdbApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the array of per-user Trakt configurations.
+    /// </summary>
+    public TraktUser[] TraktUsers { get; set; } = Array.Empty<TraktUser>();
+
+    /// <summary>
+    /// Adds a new Trakt user configuration.
+    /// </summary>
+    /// <param name="userGuid">The Jellyfin user GUID.</param>
+    public void AddUser(Guid userGuid)
+    {
+        var existingUser = TraktUsers.FirstOrDefault(u => u.LinkedMbUserId == userGuid);
+        if (existingUser != null)
+        {
+            return;
+        }
+
+        var newUser = new TraktUser { LinkedMbUserId = userGuid };
+        var userList = TraktUsers.ToList();
+        userList.Add(newUser);
+        TraktUsers = userList.ToArray();
+    }
+
+    /// <summary>
+    /// Removes a Trakt user configuration.
+    /// </summary>
+    /// <param name="userGuid">The Jellyfin user GUID.</param>
+    public void RemoveUser(Guid userGuid)
+    {
+        TraktUsers = TraktUsers.Where(u => u.LinkedMbUserId != userGuid).ToArray();
+    }
+
+    /// <summary>
+    /// Gets all Trakt user configurations.
+    /// </summary>
+    /// <returns>A read-only list of Trakt users.</returns>
+    public IReadOnlyList<TraktUser> GetAllTraktUsers()
+    {
+        return TraktUsers.ToList().AsReadOnly();
+    }
 }

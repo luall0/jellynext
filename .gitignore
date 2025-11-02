@@ -53,3 +53,6 @@ Thumbs.db
 
 # Plugin configuration (may contain API keys)
 *.log
+
+# Project planning files
+PROJECT.md

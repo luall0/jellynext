@@ -85,5 +85,3 @@ docker-compose -f docker-compose.debug.yml down -v
 - Docker volumes persist Jellyfin config between restarts
 - Use `docker-compose down -v` for a completely fresh start
 - Check `docker logs jellyfin-jellynext-debug` if plugin doesn't load
-
-See **README.debug.md** for full documentation and troubleshooting.

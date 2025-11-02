@@ -13,20 +13,57 @@
                         <h2 class="sectionTitle">JellyNext Configuration</h2>
                     </div>
 
+                    <!-- User Trakt Authorization Section -->
                     <div class="verticalSection">
-                        <h3 class="sectionTitle">Trakt Settings</h3>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="TraktClientId">Trakt Client ID:</label>
-                            <input is="emby-input" type="text" id="TraktClientId" name="TraktClientId" />
-                            <div class="fieldDescription">Get your Client ID from Trakt API settings</div>
+                        <h3 class="sectionTitle">Trakt Account Linking</h3>
+                        <div class="fieldDescription" style="margin-bottom: 1em;">
+                            Each Jellyfin user can link their own Trakt account for personalized recommendations.
                         </div>
+
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="TraktClientSecret">Trakt Client Secret:</label>
-                            <input is="emby-input" type="password" id="TraktClientSecret" name="TraktClientSecret" />
-                            <div class="fieldDescription">Get your Client Secret from Trakt API settings</div>
+                            <label class="inputLabel inputLabelUnfocused" for="UserSelector">Select User:</label>
+                            <select is="emby-select" id="UserSelector" name="UserSelector">
+                                <option value="">Loading users...</option>
+                            </select>
+                        </div>
+
+                        <div id="AuthorizationStatus" style="margin-top: 1em; display: none;">
+                            <div id="NotAuthorizedSection">
+                                <div class="fieldDescription" style="margin-bottom: 1em;">
+                                    This user has not linked their Trakt account yet.
+                                </div>
+                                <button is="emby-button" type="button" id="AuthorizeBtn" class="raised button-submit">
+                                    <span>Link Trakt Account</span>
+                                </button>
+                            </div>
+
+                            <div id="AuthorizedSection" style="display: none;">
+                                <div class="fieldDescription" style="margin-bottom: 1em; color: #52B54B;">
+                                    ✓ This user has authorized their Trakt account.
+                                </div>
+                                <button is="emby-button" type="button" id="DeauthorizeBtn" class="raised button-cancel">
+                                    <span>Unlink Trakt Account</span>
+                                </button>
+                            </div>
+
+                            <div id="AuthorizingSection" style="display: none;">
+                                <div class="fieldDescription" style="margin-bottom: 1em;">
+                                    Please visit <a href="https://trakt.tv/activate" target="_blank" style="color: #00a4dc;">https://trakt.tv/activate</a> and enter this code:
+                                </div>
+                                <div style="font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 1em 0; color: #00a4dc;" id="UserCodeDisplay">
+                                    ------
+                                </div>
+                                <div class="fieldDescription">
+                                    Waiting for authorization...
+                                </div>
+                                <div style="margin-top: 1em;">
+                                    <div class="mdl-spinner mdl-spinner--single-color mdl-js-spinner is-active" id="AuthSpinner"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- TMDB Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">TMDB Settings</h3>
                         <div class="inputContainer">
@@ -36,6 +73,7 @@
                         </div>
                     </div>
 
+                    <!-- Radarr Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Radarr Settings</h3>
                         <div class="inputContainer">
@@ -48,6 +86,7 @@
                         </div>
                     </div>
 
+                    <!-- Sonarr Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Sonarr Settings</h3>
                         <div class="inputContainer">
@@ -60,6 +99,7 @@
                         </div>
                     </div>
 
+                    <!-- Sync Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Sync Settings</h3>
                         <div class="inputContainer">
@@ -71,7 +111,7 @@
 
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block">
-                            <span>Save</span>
+                            <span>Save Configuration</span>
                         </button>
                     </div>
                 </form>
@@ -80,14 +120,168 @@
 
         <script type="text/javascript">
             var JellyNextConfig = {
-                pluginUniqueId: 'a4df60c5-6ab4-412a-8f79-2cab93fb2bc5'
+                pluginUniqueId: 'a4df60c5-6ab4-412a-8f79-2cab93fb2bc5',
+                currentUserGuid: null,
+                authCheckInterval: null
             };
 
+            // Load users into dropdown
+            function loadUsers() {
+                ApiClient.getUsers().then(function (users) {
+                    var userSelector = document.getElementById('UserSelector');
+                    userSelector.innerHTML = '<option value="">Select a user...</option>';
+
+                    users.forEach(function (user) {
+                        var option = document.createElement('option');
+                        option.value = user.Id;
+                        option.textContent = user.Name;
+                        userSelector.appendChild(option);
+                    });
+                });
+            }
+
+            // Check authorization status for selected user
+            function checkAuthorizationStatus(userGuid) {
+                if (!userGuid) {
+                    document.getElementById('AuthorizationStatus').style.display = 'none';
+                    return;
+                }
+
+                JellyNextConfig.currentUserGuid = userGuid;
+                document.getElementById('AuthorizationStatus').style.display = 'block';
+
+                ApiClient.fetch({
+                    type: 'GET',
+                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + userGuid + '/AuthorizationStatus')
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (status) {
+                    if (status.isAuthorized) {
+                        showAuthorizedState();
+                    } else {
+                        showNotAuthorizedState();
+                    }
+                }).catch(function (error) {
+                    console.error('Error checking authorization status:', error);
+                    showNotAuthorizedState();
+                });
+            }
+
+            // Show not authorized state
+            function showNotAuthorizedState() {
+                document.getElementById('NotAuthorizedSection').style.display = 'block';
+                document.getElementById('AuthorizedSection').style.display = 'none';
+                document.getElementById('AuthorizingSection').style.display = 'none';
+            }
+
+            // Show authorized state
+            function showAuthorizedState() {
+                document.getElementById('NotAuthorizedSection').style.display = 'none';
+                document.getElementById('AuthorizedSection').style.display = 'block';
+                document.getElementById('AuthorizingSection').style.display = 'none';
+            }
+
+            // Show authorizing state
+            function showAuthorizingState(userCode) {
+                document.getElementById('NotAuthorizedSection').style.display = 'none';
+                document.getElementById('AuthorizedSection').style.display = 'none';
+                document.getElementById('AuthorizingSection').style.display = 'block';
+                document.getElementById('UserCodeDisplay').textContent = userCode;
+            }
+
+            // Start OAuth authorization
+            document.getElementById('AuthorizeBtn').addEventListener('click', function () {
+                if (!JellyNextConfig.currentUserGuid) {
+                    Dashboard.alert('Please select a user first');
+                    return;
+                }
+
+                Dashboard.showLoadingMsg();
+
+                ApiClient.fetch({
+                    type: 'POST',
+                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/Authorize')
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (result) {
+                    Dashboard.hideLoadingMsg();
+                    showAuthorizingState(result.userCode);
+
+                    // Poll for authorization completion
+                    JellyNextConfig.authCheckInterval = setInterval(function () {
+                        checkAuthorizationCompletion();
+                    }, 3000); // Check every 3 seconds
+                }).catch(function (error) {
+                    Dashboard.hideLoadingMsg();
+                    console.error('Error starting authorization:', error);
+                    Dashboard.alert('Failed to start authorization. Please try again.');
+                });
+            });
+
+            // Check if authorization is complete
+            function checkAuthorizationCompletion() {
+                ApiClient.fetch({
+                    type: 'GET',
+                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/AuthorizationStatus')
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (status) {
+                    if (status.isAuthorized) {
+                        clearInterval(JellyNextConfig.authCheckInterval);
+                        Dashboard.alert('Successfully linked Trakt account!');
+                        showAuthorizedState();
+                    }
+                }).catch(function (error) {
+                    console.error('Error checking authorization completion:', error);
+                });
+            }
+
+            // Deauthorize user
+            document.getElementById('DeauthorizeBtn').addEventListener('click', function () {
+                if (!JellyNextConfig.currentUserGuid) {
+                    return;
+                }
+
+                if (!confirm('Are you sure you want to unlink this Trakt account?')) {
+                    return;
+                }
+
+                Dashboard.showLoadingMsg();
+
+                ApiClient.fetch({
+                    type: 'POST',
+                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/Deauthorize')
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (result) {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Successfully unlinked Trakt account');
+                    showNotAuthorizedState();
+                }).catch(function (error) {
+                    Dashboard.hideLoadingMsg();
+                    console.error('Error deauthorizing:', error);
+                    Dashboard.alert('Failed to unlink Trakt account');
+                });
+            });
+
+            // User selection change
+            document.getElementById('UserSelector').addEventListener('change', function (e) {
+                var userGuid = e.target.value;
+                if (JellyNextConfig.authCheckInterval) {
+                    clearInterval(JellyNextConfig.authCheckInterval);
+                }
+                checkAuthorizationStatus(userGuid);
+            });
+
+            // Load configuration on page show
             document.getElementById('JellyNextConfigPage').addEventListener('pageshow', function () {
                 Dashboard.showLoadingMsg();
+
+                // Load users
+                loadUsers();
+
+                // Load plugin configuration
                 ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
-                    document.getElementById('TraktClientId').value = config.TraktClientId || '';
-                    document.getElementById('TraktClientSecret').value = config.TraktClientSecret || '';
                     document.getElementById('TmdbApiKey').value = config.TmdbApiKey || '';
                     document.getElementById('RadarrUrl').value = config.RadarrUrl || '';
                     document.getElementById('RadarrApiKey').value = config.RadarrApiKey || '';
@@ -98,13 +292,12 @@
                 });
             });
 
+            // Save configuration on form submit
             document.getElementById('JellyNextConfigForm').addEventListener('submit', function (e) {
                 e.preventDefault();
                 Dashboard.showLoadingMsg();
 
                 ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
-                    config.TraktClientId = document.getElementById('TraktClientId').value;
-                    config.TraktClientSecret = document.getElementById('TraktClientSecret').value;
                     config.TmdbApiKey = document.getElementById('TmdbApiKey').value;
                     config.RadarrUrl = document.getElementById('RadarrUrl').value;
                     config.RadarrApiKey = document.getElementById('RadarrApiKey').value;
@@ -118,6 +311,13 @@
                 });
 
                 return false;
+            });
+
+            // Cleanup on page hide
+            document.getElementById('JellyNextConfigPage').addEventListener('pagehide', function () {
+                if (JellyNextConfig.authCheckInterval) {
+                    clearInterval(JellyNextConfig.authCheckInterval);
+                }
             });
         </script>
     </div>

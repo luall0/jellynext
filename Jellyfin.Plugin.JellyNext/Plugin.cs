@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Jellyfin.Plugin.JellyNext.Configuration;
+using Jellyfin.Plugin.JellyNext.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.JellyNext;
 
@@ -22,6 +26,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+        PollingTasks = new ConcurrentDictionary<Guid, Task<bool>>();
     }
 
     /// <inheritdoc />
@@ -34,6 +39,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// Gets the current plugin instance.
     /// </summary>
     public static Plugin? Instance { get; private set; }
+
+    /// <summary>
+    /// Gets the dictionary of active OAuth polling tasks keyed by user GUID.
+    /// </summary>
+    public ConcurrentDictionary<Guid, Task<bool>> PollingTasks { get; }
 
     /// <inheritdoc />
     public IEnumerable<PluginPageInfo> GetPages()
