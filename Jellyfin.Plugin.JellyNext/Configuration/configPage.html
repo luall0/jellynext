@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JellyNext Configuration</title>
+</head>
+<body>
+    <div id="JellyNextConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="JellyNextConfigForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">JellyNext Configuration</h2>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Trakt Settings</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="TraktClientId">Trakt Client ID:</label>
+                            <input is="emby-input" type="text" id="TraktClientId" name="TraktClientId" />
+                            <div class="fieldDescription">Get your Client ID from Trakt API settings</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="TraktClientSecret">Trakt Client Secret:</label>
+                            <input is="emby-input" type="password" id="TraktClientSecret" name="TraktClientSecret" />
+                            <div class="fieldDescription">Get your Client Secret from Trakt API settings</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">TMDB Settings</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDB API Key:</label>
+                            <input is="emby-input" type="text" id="TmdbApiKey" name="TmdbApiKey" />
+                            <div class="fieldDescription">Required for fetching metadata and images</div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Radarr Settings</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RadarrUrl">Radarr URL:</label>
+                            <input is="emby-input" type="text" id="RadarrUrl" name="RadarrUrl" placeholder="http://localhost:7878" />
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RadarrApiKey">Radarr API Key:</label>
+                            <input is="emby-input" type="text" id="RadarrApiKey" name="RadarrApiKey" />
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Sonarr Settings</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="SonarrUrl">Sonarr URL:</label>
+                            <input is="emby-input" type="text" id="SonarrUrl" name="SonarrUrl" placeholder="http://localhost:8989" />
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="SonarrApiKey">Sonarr API Key:</label>
+                            <input is="emby-input" type="text" id="SonarrApiKey" name="SonarrApiKey" />
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Sync Settings</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="SyncIntervalHours">Sync Interval (hours):</label>
+                            <input is="emby-input" type="number" id="SyncIntervalHours" name="SyncIntervalHours" min="1" max="168" />
+                            <div class="fieldDescription">How often to sync recommendations from Trakt (1-168 hours)</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var JellyNextConfig = {
+                pluginUniqueId: 'a4df60c5-6ab4-412a-8f79-2cab93fb2bc5'
+            };
+
+            document.getElementById('JellyNextConfigPage').addEventListener('pageshow', function () {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
+                    document.getElementById('TraktClientId').value = config.TraktClientId || '';
+                    document.getElementById('TraktClientSecret').value = config.TraktClientSecret || '';
+                    document.getElementById('TmdbApiKey').value = config.TmdbApiKey || '';
+                    document.getElementById('RadarrUrl').value = config.RadarrUrl || '';
+                    document.getElementById('RadarrApiKey').value = config.RadarrApiKey || '';
+                    document.getElementById('SonarrUrl').value = config.SonarrUrl || '';
+                    document.getElementById('SonarrApiKey').value = config.SonarrApiKey || '';
+                    document.getElementById('SyncIntervalHours').value = config.SyncIntervalHours || 6;
+                    Dashboard.hideLoadingMsg();
+                });
+            });
+
+            document.getElementById('JellyNextConfigForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                Dashboard.showLoadingMsg();
+
+                ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
+                    config.TraktClientId = document.getElementById('TraktClientId').value;
+                    config.TraktClientSecret = document.getElementById('TraktClientSecret').value;
+                    config.TmdbApiKey = document.getElementById('TmdbApiKey').value;
+                    config.RadarrUrl = document.getElementById('RadarrUrl').value;
+                    config.RadarrApiKey = document.getElementById('RadarrApiKey').value;
+                    config.SonarrUrl = document.getElementById('SonarrUrl').value;
+                    config.SonarrApiKey = document.getElementById('SonarrApiKey').value;
+                    config.SyncIntervalHours = parseInt(document.getElementById('SyncIntervalHours').value);
+
+                    ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                    });
+                });
+
+                return false;
+            });
+        </script>
+    </div>
+</body>
+</html>
