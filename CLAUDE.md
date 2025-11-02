@@ -109,25 +109,42 @@ Jellyfin.Plugin.JellyNext/
 ├── Api/
 │   └── TraktController.cs        # OAuth endpoints
 ├── Services/
-│   └── TraktApi.cs               # Trakt API integration
+│   ├── TraktApi.cs               # Trakt API integration
+│   ├── TmdbService.cs            # TMDB API key management (custom or Jellyfin's)
+│   ├── ContentCacheService.cs    # In-memory cache for synced content
+│   └── ContentSyncService.cs     # Orchestrates syncing across providers
+├── Providers/
+│   ├── IContentProvider.cs       # Interface for content providers
+│   └── RecommendationsProvider.cs # Trakt recommendations implementation
+├── ScheduledTasks/
+│   └── ContentSyncScheduledTask.cs # Jellyfin scheduled task for syncing
 ├── Models/
 │   ├── TraktUser.cs              # Per-user OAuth storage
 │   ├── TraktDeviceCode.cs        # OAuth device flow
 │   ├── TraktUserAccessToken.cs   # OAuth tokens
-│   └── TraktUserRefreshTokenRequest.cs
+│   ├── TraktUserRefreshTokenRequest.cs
+│   ├── TraktMovie.cs             # Trakt movie response
+│   ├── TraktShow.cs              # Trakt show response
+│   ├── TraktIds.cs               # External IDs (TMDB, IMDB, TVDB, etc)
+│   ├── ContentItem.cs            # Unified content representation
+│   └── ContentType.cs            # Movie/Show enum
 ├── Helpers/
 │   └── UserHelper.cs             # TraktUser lookup utility
-├── Plugin.cs                     # Entry point + polling tasks
+├── Plugin.cs                     # Entry point + IServerApplicationHost
 └── PluginServiceRegistrator.cs  # DI service registration
 ```
 
 ### Key Plugin Components
-- **Plugin.cs**: Main entry point, inherits `BasePlugin<PluginConfiguration>`, tracks OAuth polling tasks
-- **PluginConfiguration**: Stores global settings (Radarr/Sonarr URLs/keys, TMDB key, sync interval, per-user TraktUser array)
-- **PluginServiceRegistrator**: Registers TraktApi and HttpClient in DI container
+- **Plugin.cs**: Main entry point, inherits `BasePlugin<PluginConfiguration>`, tracks OAuth polling tasks, exposes `IServerApplicationHost`
+- **PluginConfiguration**: Stores global settings (Radarr/Sonarr URLs/keys, optional TMDB key, cache expiration, ignore filters, per-user TraktUser array)
+- **PluginServiceRegistrator**: Registers all services and content providers in DI container
 - **TraktController**: REST endpoints for OAuth (authorize, deauthorize, status check)
-- **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls
-- **TraktUser**: Per-user OAuth tokens + preferences (stored in PluginConfiguration.TraktUsers array)
+- **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls, recommendations fetching
+- **TmdbService**: Manages TMDB API key (uses custom if provided, falls back to Jellyfin's via reflection)
+- **ContentCacheService**: In-memory per-user, per-provider cache with automatic expiration
+- **ContentSyncService**: Orchestrates syncing across all registered `IContentProvider` implementations
+- **IContentProvider**: Modular interface for content sources (recommendations, watchlist, trending, etc.)
+- **ContentSyncScheduledTask**: Jellyfin scheduled task (configurable in Dashboard)
 
 ## Key Conventions
 
@@ -153,6 +170,7 @@ Jellyfin.Plugin.JellyNext/
 - Register services in `PluginServiceRegistrator.cs` implementing `IPluginServiceRegistrator`
 - Must register `AddHttpClient()` before services that use `IHttpClientFactory`
 - Services auto-discovered by Jellyfin on plugin load
+- Content providers registered as `IContentProvider` interface - automatically discovered by `ContentSyncService`
 
 ### Per-User Architecture Pattern
 - Virtual libraries must be **filtered by current Jellyfin user**
@@ -183,6 +201,23 @@ Jellyfin.Plugin.JellyNext/
 - Must work on all official Jellyfin clients (Web, iOS, Android, TV, Kodi)
 - Cannot rely on Web UI-only features for core functionality
 - Optional: Web UI JavaScript injection for enhanced UX
+
+### Modular Content Provider System
+- **IContentProvider interface**: Extensible contract for content sources
+  - `ProviderName`: Unique identifier (e.g., "recommendations", "watchlist")
+  - `LibraryName`: Display name for virtual library
+  - `FetchContentAsync(userId)`: Fetches content for specific user
+  - `IsEnabledForUser(userId)`: Checks if provider enabled for user
+- **Easy to add new providers**: Create class implementing `IContentProvider`, register in DI → automatic sync/caching
+- **ContentItem model**: Unified representation (movies + shows, all external IDs)
+- **ContentSyncService**: Orchestrates syncing across all providers with error isolation
+- **ContentCacheService**: Per-user, per-provider in-memory cache with configurable expiration
+
+### TMDB API Key Management
+- **Optional configuration**: Users can provide custom TMDB API key (free at themoviedb.org)
+- **Automatic fallback**: If no key provided, uses Jellyfin's built-in TMDB key via reflection
+- **Benefits of custom key**: Dedicated rate limits, avoids high-traffic metadata issues
+- **TmdbService.GetTmdbApiKey()**: Handles custom key priority + reflection fallback with caching
 
 ## Implemented Features
 
@@ -219,13 +254,46 @@ Jellyfin.Plugin.JellyNext/
 - `GET /JellyNext/Trakt/Users/{userGuid}/AuthorizationStatus` - Check status
 - `POST /JellyNext/Trakt/Users/{userGuid}/Deauthorize` - Revoke access
 
+### ✅ Trakt Recommendations API
+**Endpoints:**
+- `TraktApi.GetMovieRecommendations(traktUser, ignoreCollected, ignoreWatchlisted, limit)` - Fetches personalized movie recommendations
+- `TraktApi.GetShowRecommendations(traktUser, ignoreCollected, ignoreWatchlisted, limit)` - Fetches personalized show recommendations
+
+**Configuration:**
+- `IgnoreCollected` (default: true) - Filter out items in user's Trakt collection
+- `IgnoreWatchlisted` (default: false) - Filter out items in user's watchlist
+- Both configurable via plugin settings page
+
+**Implementation:**
+- Returns `TraktMovie[]` and `TraktShow[]` with IDs (Trakt, TMDB, IMDB, TVDB)
+- Automatic token refresh before API calls
+- Error handling with empty array fallback
+
+### ✅ Modular Content Sync System
+**Architecture:**
+- `ContentSyncScheduledTask` - Jellyfin scheduled task (appears in Dashboard → Scheduled Tasks)
+- Default trigger: every 6 hours (user-configurable in Dashboard)
+- `ContentSyncService.SyncAllAsync()` - Syncs all users across all registered providers
+- Per-provider error isolation - one failure doesn't break entire sync
+
+**Caching:**
+- `ContentCacheService` - In-memory cache per user per provider
+- `CacheExpirationHours` config (default: 6 hours) - Controls data freshness
+- Cache serves instant results for virtual library browsing
+- Protects against Trakt API rate limits
+
+**Current Providers:**
+- `RecommendationsProvider` - Fetches movie + show recommendations (up to 50 each)
+
 ## Core Workflows
 
 ### Initial Setup (Admin)
 1. Admin configures plugin via Jellyfin Dashboard
-2. Enter TMDB API key
+2. (Optional) Enter custom TMDB API key (uses Jellyfin's key if not provided)
 3. Enter Radarr/Sonarr URLs + API keys
-4. Set sync interval (default: 6 hours)
+4. Configure recommendation filters (ignore collected/watchlisted)
+5. Set cache expiration (default: 6 hours)
+6. Configure sync schedule in Dashboard → Scheduled Tasks → "Sync Trakt Content"
 
 ### User Trakt Linking (Per-User)
 1. Admin opens plugin config → selects Jellyfin user from dropdown
@@ -261,5 +329,19 @@ Jellyfin.Plugin.JellyNext/
 - Use `Plugin.Instance?.Configuration` not `Plugin.Instance?.PluginConfiguration`
 - `BasePlugin<T>` exposes config as `Configuration` property
 - `UserHelper.GetTraktUser(userGuid)` is the standard way to lookup per-user tokens
+
+### TMDB API Key Access
+- **TmdbService** handles TMDB API key with intelligent fallback
+- Custom key from config is prioritized
+- Fallback uses reflection to access Jellyfin's TMDB plugin configuration
+- Reflection path: `IServerApplicationHost` → `PluginManager` → `TmdbPlugin` → `Configuration.TmdbApiKey`
+- Cached after first reflection lookup for performance
+
+### Content Sync Architecture
+- **Scheduled task** (`ContentSyncScheduledTask`) registered with Jellyfin's task manager
+- `GetDefaultTriggers()` sets initial 6-hour interval (user can change in Dashboard)
+- **Cache expiration** is separate from sync schedule (prevents indefinitely stale data)
+- Cache serves instant responses when browsing virtual libraries
+- Sync refreshes cache on schedule or manual trigger
 
 ---

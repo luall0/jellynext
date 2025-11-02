@@ -242,4 +242,88 @@ public class TraktApi
 
         return httpClient;
     }
+
+    /// <summary>
+    /// Gets personalized movie recommendations for a user.
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration.</param>
+    /// <param name="ignoreCollected">Whether to ignore collected movies.</param>
+    /// <param name="ignoreWatchlisted">Whether to ignore watchlisted movies.</param>
+    /// <param name="limit">Maximum number of recommendations to return (default: 10, max: 100).</param>
+    /// <returns>List of recommended movies.</returns>
+    public async Task<TraktMovie[]> GetMovieRecommendations(
+        TraktUser traktUser,
+        bool ignoreCollected = true,
+        bool ignoreWatchlisted = false,
+        int limit = 10)
+    {
+        var queryParams = $"?limit={limit}";
+        if (ignoreCollected)
+        {
+            queryParams += "&ignore_collected=true";
+        }
+
+        if (ignoreWatchlisted)
+        {
+            queryParams += "&ignore_watchlisted=true";
+        }
+
+        using var httpClient = await CreateTraktClient(traktUser);
+        var response = await httpClient.GetAsync($"/recommendations/movies{queryParams}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError(
+                "Failed to get movie recommendations: Status={Status}, Content={Content}",
+                response.StatusCode,
+                errorContent);
+            return Array.Empty<TraktMovie>();
+        }
+
+        var movies = await response.Content.ReadFromJsonAsync<TraktMovie[]>(_jsonOptions);
+        return movies ?? Array.Empty<TraktMovie>();
+    }
+
+    /// <summary>
+    /// Gets personalized show recommendations for a user.
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration.</param>
+    /// <param name="ignoreCollected">Whether to ignore collected shows.</param>
+    /// <param name="ignoreWatchlisted">Whether to ignore watchlisted shows.</param>
+    /// <param name="limit">Maximum number of recommendations to return (default: 10, max: 100).</param>
+    /// <returns>List of recommended shows.</returns>
+    public async Task<TraktShow[]> GetShowRecommendations(
+        TraktUser traktUser,
+        bool ignoreCollected = true,
+        bool ignoreWatchlisted = false,
+        int limit = 10)
+    {
+        var queryParams = $"?limit={limit}";
+        if (ignoreCollected)
+        {
+            queryParams += "&ignore_collected=true";
+        }
+
+        if (ignoreWatchlisted)
+        {
+            queryParams += "&ignore_watchlisted=true";
+        }
+
+        using var httpClient = await CreateTraktClient(traktUser);
+        var response = await httpClient.GetAsync($"/recommendations/shows{queryParams}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError(
+                "Failed to get show recommendations: Status={Status}, Content={Content}",
+                response.StatusCode,
+                errorContent);
+            return Array.Empty<TraktShow>();
+        }
+
+        var shows = await response.Content.ReadFromJsonAsync<TraktShow[]>(_jsonOptions);
+        return shows ?? Array.Empty<TraktShow>();
+    }
 }

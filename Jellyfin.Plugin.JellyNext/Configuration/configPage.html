@@ -65,11 +65,13 @@
 
                     <!-- TMDB Settings -->
                     <div class="verticalSection">
-                        <h3 class="sectionTitle">TMDB Settings</h3>
+                        <h3 class="sectionTitle">TMDB Settings (Optional)</h3>
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDB API Key:</label>
-                            <input is="emby-input" type="text" id="TmdbApiKey" name="TmdbApiKey" />
-                            <div class="fieldDescription">Required for fetching metadata and images</div>
+                            <input is="emby-input" type="text" id="TmdbApiKey" name="TmdbApiKey" placeholder="Optional - uses Jellyfin's key if empty" />
+                            <div class="fieldDescription">
+                                Optional: Provide your own TMDB API key (free at themoviedb.org) for dedicated rate limits and to avoid metadata issues during high traffic.
+                            </div>
                         </div>
                     </div>
 
@@ -99,13 +101,40 @@
                         </div>
                     </div>
 
-                    <!-- Sync Settings -->
+                    <!-- Recommendations Settings -->
                     <div class="verticalSection">
-                        <h3 class="sectionTitle">Sync Settings</h3>
+                        <h3 class="sectionTitle">Recommendations Settings</h3>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="IgnoreCollected" name="IgnoreCollected" />
+                                <span>Ignore Collected Items</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Hide movies and shows you've already added to your Trakt collection from recommendations
+                            </div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="IgnoreWatchlisted" name="IgnoreWatchlisted" />
+                                <span>Ignore Watchlisted Items</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Hide movies and shows in your Trakt watchlist from recommendations
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cache Settings -->
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Cache Settings</h3>
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="SyncIntervalHours">Sync Interval (hours):</label>
-                            <input is="emby-input" type="number" id="SyncIntervalHours" name="SyncIntervalHours" min="1" max="168" />
-                            <div class="fieldDescription">How often to sync recommendations from Trakt (1-168 hours)</div>
+                            <label class="inputLabel inputLabelUnfocused" for="CacheExpirationHours">Cache Expiration (hours):</label>
+                            <input is="emby-input" type="number" id="CacheExpirationHours" name="CacheExpirationHours" min="1" max="168" />
+                            <div class="fieldDescription">
+                                How long cached content remains valid before requiring a fresh fetch from Trakt (1-168 hours).
+                                Cached data is served instantly when browsing virtual libraries, avoiding API rate limits and improving performance.
+                                Configure sync schedule in Dashboard → Scheduled Tasks → "Sync Trakt Content".
+                            </div>
                         </div>
                     </div>
 
@@ -287,7 +316,9 @@
                     document.getElementById('RadarrApiKey').value = config.RadarrApiKey || '';
                     document.getElementById('SonarrUrl').value = config.SonarrUrl || '';
                     document.getElementById('SonarrApiKey').value = config.SonarrApiKey || '';
-                    document.getElementById('SyncIntervalHours').value = config.SyncIntervalHours || 6;
+                    document.getElementById('IgnoreCollected').checked = config.IgnoreCollected !== false;
+                    document.getElementById('IgnoreWatchlisted').checked = config.IgnoreWatchlisted === true;
+                    document.getElementById('CacheExpirationHours').value = config.CacheExpirationHours || 6;
                     Dashboard.hideLoadingMsg();
                 });
             });
@@ -303,7 +334,9 @@
                     config.RadarrApiKey = document.getElementById('RadarrApiKey').value;
                     config.SonarrUrl = document.getElementById('SonarrUrl').value;
                     config.SonarrApiKey = document.getElementById('SonarrApiKey').value;
-                    config.SyncIntervalHours = parseInt(document.getElementById('SyncIntervalHours').value);
+                    config.IgnoreCollected = document.getElementById('IgnoreCollected').checked;
+                    config.IgnoreWatchlisted = document.getElementById('IgnoreWatchlisted').checked;
+                    config.CacheExpirationHours = parseInt(document.getElementById('CacheExpirationHours').value);
 
                     ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);

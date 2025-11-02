@@ -6,6 +6,7 @@ using Jellyfin.Plugin.JellyNext.Configuration;
 using Jellyfin.Plugin.JellyNext.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
+using MediaBrowser.Controller;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,10 +23,15 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// </summary>
     /// <param name="applicationPaths">Instance of the <see cref="IApplicationPaths"/> interface.</param>
     /// <param name="xmlSerializer">Instance of the <see cref="IXmlSerializer"/> interface.</param>
-    public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
+    /// <param name="applicationHost">Instance of the <see cref="IServerApplicationHost"/> interface.</param>
+    public Plugin(
+        IApplicationPaths applicationPaths,
+        IXmlSerializer xmlSerializer,
+        IServerApplicationHost applicationHost)
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+        ApplicationHost = applicationHost;
         PollingTasks = new ConcurrentDictionary<Guid, Task<bool>>();
     }
 
@@ -39,6 +45,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// Gets the current plugin instance.
     /// </summary>
     public static Plugin? Instance { get; private set; }
+
+    /// <summary>
+    /// Gets the application host.
+    /// </summary>
+    public IServerApplicationHost ApplicationHost { get; }
 
     /// <summary>
     /// Gets the dictionary of active OAuth polling tasks keyed by user GUID.

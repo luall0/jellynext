@@ -32,14 +32,24 @@ public class PluginConfiguration : BasePluginConfiguration
     public string SonarrApiKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the sync interval in hours.
+    /// Gets or sets the cache expiration interval in hours.
     /// </summary>
-    public int SyncIntervalHours { get; set; } = 6;
+    public int CacheExpirationHours { get; set; } = 6;
 
     /// <summary>
-    /// Gets or sets the TMDB API Key.
+    /// Gets or sets the TMDB API Key (optional - uses Jellyfin's key if not provided).
     /// </summary>
     public string TmdbApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to ignore collected items in recommendations.
+    /// </summary>
+    public bool IgnoreCollected { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to ignore watchlisted items in recommendations.
+    /// </summary>
+    public bool IgnoreWatchlisted { get; set; } = false;
 
     /// <summary>
     /// Gets or sets the array of per-user Trakt configurations.
