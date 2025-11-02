@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  jellyfin:
+    build:
+      context: .
+      dockerfile: Dockerfile.debug
+    container_name: jellyfin-jellynext-debug
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      # Enable debugging
+      - DOTNET_EnableDiagnostics=1
+    volumes:
+      # Mount the built plugin DLL
+      - ./Jellyfin.Plugin.JellyNext/bin/Debug/net8.0/Jellyfin.Plugin.JellyNext.dll:/config/plugins/JellyNext_1.0.0.0/Jellyfin.Plugin.JellyNext.dll:ro
+      - ./Jellyfin.Plugin.JellyNext/bin/Debug/net8.0/Jellyfin.Plugin.JellyNext.pdb:/config/plugins/JellyNext_1.0.0.0/Jellyfin.Plugin.JellyNext.pdb:ro
+      # Jellyfin data persistence (optional, comment out for clean start each time)
+      - jellyfin-config:/config
+      - jellyfin-cache:/cache
+    ports:
+      - "8096:8096"   # HTTP Web UI
+      - "8920:8920"   # HTTPS Web UI (optional)
+      - "4024:4024"   # Remote debugger port
+    restart: unless-stopped
+
+volumes:
+  jellyfin-config:
+  jellyfin-cache:

@@ -1,0 +1,19 @@
+FROM jellyfin/jellyfin:latest
+
+# Install debugging tools
+RUN apt-get update && \
+    apt-get install -y curl unzip && \
+    curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create plugin directory
+RUN mkdir -p /config/plugins/JellyNext_1.0.0.0
+
+# The plugin DLL will be mounted as a volume during development
+VOLUME /config/plugins/JellyNext_1.0.0.0
+
+# Expose Jellyfin ports and debugger port
+EXPOSE 8096 8920 4024
+
+# Keep default Jellyfin entrypoint

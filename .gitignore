@@ -20,7 +20,12 @@ bld/
 *.sln.docstates
 
 # JetBrains Rider
-.idea/
+.idea/*
+!.idea/.idea.Jellyfin.Plugin.JellyNext/
+.idea/.idea.Jellyfin.Plugin.JellyNext/*
+!.idea/.idea.Jellyfin.Plugin.JellyNext/.idea/
+.idea/.idea.Jellyfin.Plugin.JellyNext/.idea/*
+!.idea/.idea.Jellyfin.Plugin.JellyNext/.idea/runConfigurations/
 *.sln.iml
 
 # Build artifacts
