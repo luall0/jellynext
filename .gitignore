@@ -60,3 +60,5 @@ docker-data/
 # Project planning files
 PROJECT.md
 VIRTUAL_LIBRARY.md
+INJECT.md
+PLAYBACK.md

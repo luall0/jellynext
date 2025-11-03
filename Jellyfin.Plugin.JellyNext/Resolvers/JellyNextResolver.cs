@@ -333,7 +333,9 @@ public class JellyNextResolver : IItemResolver
             Name = contentItem.Title,
             Path = args.Path,
             ProductionYear = contentItem.Year,
-            PremiereDate = contentItem.Year.HasValue ? new DateTime(contentItem.Year.Value, 1, 1) : null
+            PremiereDate = contentItem.Year.HasValue ? new DateTime(contentItem.Year.Value, 1, 1) : null,
+            RunTimeTicks = 90 * TimeSpan.TicksPerMinute, // Dummy 90 minute runtime
+            Container = "strm"
         };
 
         // Add provider IDs for metadata lookup

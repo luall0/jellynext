@@ -448,8 +448,9 @@ Jellyfin.Plugin.JellyNext/
    - Extracts user ID from path using regex: `jellynext-virtual[/\\]([a-f0-9-]+)[/\\]`
    - Looks up movie details from `ContentCacheService`
    - Calls `RadarrService.AddMovieAsync()` to add movie to Radarr
-   - Logs success/failure
-4. Playback fails naturally (since .strm file has no valid content), but download is already triggered
+   - Stops playback immediately using `SendPlaystateCommand(Stop)`
+   - Sends user notification via `SendMessageCommand()` with success/failure message
+   - Message displays for 5 seconds with title "JellyNext Download"
 
 **Service Components:**
 - `PlaybackInterceptor(ISessionManager, RadarrService, ContentCacheService)` - Constructor with DI
@@ -472,19 +473,27 @@ Jellyfin.Plugin.JellyNext/
 - Works on all Jellyfin clients (Web, Android, iOS, TV, Kodi)
 - No client modifications required
 - Operates at server API level via session manager events
-- User experience: Click Play → Brief loading → Playback fails → Movie downloading in background
+- User experience: Click Play → Playback stops immediately → Notification appears → Movie downloading in background
+
+**User Notifications:**
+- Success message: "{Title} ({Year}) has been added to your download queue and will appear in your library shortly."
+- Failure message: "Failed to add {Title} ({Year}) to download queue. Please check your Radarr configuration."
+- Notification displayed via `ISessionManager.SendMessageCommand()`
+- Shows for 5 seconds with header "JellyNext Download"
+- Works across all Jellyfin clients (Web, mobile, TV apps)
 
 **Error Handling:**
 - Validates TMDB ID extraction from filename
 - Validates user ID extraction from path
 - Checks if movie exists in cache before triggering download
+- Gracefully handles message/playback stop failures (logs warnings, doesn't block download)
 - Logs all errors (invalid path format, missing cache entry, Radarr API failures)
-- Graceful failure - invalid requests logged but don't crash plugin
+- Invalid requests logged but don't crash plugin
 
 **Important Notes:**
-- Playback will fail for virtual items (expected behavior - .strm files have no media)
-- Download happens in background - user sees in Radarr activity
-- Future enhancement: Add user notifications when Jellyfin notification API is available
+- Playback stops immediately when virtual item detected (no buffering or error screens)
+- User receives immediate feedback via on-screen notification
+- Download happens in background - also visible in Radarr activity
 - Only works for movies currently - TV shows support planned separately
 
 ## Core Workflows
@@ -513,11 +522,14 @@ Jellyfin.Plugin.JellyNext/
 6. Enrich with TMDB metadata (poster, description)
 
 ### Download Trigger
-1. User clicks Play on virtual item with `plugin://` path
-2. Plugin intercepts playback request
-3. Parse TMDB ID from URL
-4. Call Radarr/Sonarr API to add media
-5. Show notification to user (download initiated)
+1. User clicks Play on virtual item (recommendation not yet in library)
+2. PlaybackInterceptor detects virtual item path during PlaybackStart event
+3. Extracts TMDB ID from .strm filename and user ID from path
+4. Looks up movie details in ContentCacheService
+5. Calls Radarr API to add movie (with monitoring + search enabled)
+6. Stops playback immediately via SendPlaystateCommand(Stop)
+7. Displays on-screen notification to user (5 second timeout)
+8. Download proceeds in background, visible in Radarr activity
 
 ## Important Gotchas
 
@@ -572,5 +584,45 @@ Jellyfin.Plugin.JellyNext/
   - Shows: Must set TVDB (primary), TMDB, and IMDB ProviderIds on Series object for metadata to resolve
 - **User context**: Resolver looks up content in cache using extracted userId - ensures each user sees only their recommendations
 - **Content type mapping**: Directory name (e.g., `movies_recommendations` or `shows_recommendations`) maps to provider name (e.g., `recommendations`) via `VirtualLibraryContentTypeHelper`
+
+### FFprobe Compatibility for Cross-Client Support
+**Problem**: Some Jellyfin clients (especially iOS/tvOS) probe .strm files with FFprobe when opening item details, causing crashes if:
+- File contains invalid protocols like `plugin://` → "Protocol not found" error
+- File contains unreachable HTTP URLs → "Input/output error"
+- File is empty → FFprobe fails with null streams/format
+
+**Solution - Embedded Dummy Video File**:
+- **Embed minimal valid video** - Plugin includes pre-generated `dummy.mp4` (2.3KB, 1-second black video, 320x240) as embedded resource
+- **Extract on initialization** - Copies embedded video from assembly to plugin data directory once
+- **Point .strm files to dummy** - All .strm files contain absolute path to dummy video: `/path/to/jellynext-virtual/dummy.mp4`
+- **FFprobe succeeds** - FFprobe can read the dummy video and extract valid stream info (h264 video, no audio)
+- **Playback still intercepted** - PlaybackInterceptor detects by path pattern `jellynext-virtual`, not file content
+- **Fallback to HTTP** - If extraction fails, falls back to `http://jellynext-placeholder/` URL
+
+**Implementation Details**:
+- `Resources/dummy.mp4` - Pre-generated minimal MP4 (320x240, 1 second, h264) embedded in plugin assembly
+- `VirtualLibraryManager.CreateDummyVideo()` - Extracts embedded resource to plugin data directory
+- Extraction process:
+  1. Check if `dummy.mp4` already exists in plugin data directory
+  2. If not, extract from embedded resources using `Assembly.GetManifestResourceStream()`
+  3. Copy stream to file system
+  4. Log file size for verification
+- No external dependencies (no ffmpeg required)
+- Only extracted once (survives plugin reloads)
+- Graceful fallback to HTTP URL if extraction fails
+
+**Why This Works**:
+- **Real video file** - FFprobe successfully probes valid MP4, returns stream metadata
+- **All clients happy** - tvOS/iOS apps no longer crash because FFprobe succeeds
+- **Metadata from filename** - Resolver still extracts IDs from filename patterns (TMDB/TVDB IDs in brackets)
+- **Playback interception works** - Detects by path containing "jellynext-virtual", not by analyzing file content
+- **Minimal overhead** - Tiny 1-second video (~10KB), created once, shared by all virtual items
+- **Dummy runtime still set** - Resolver adds `RunTimeTicks = 90 * TimeSpan.TicksPerMinute` for UI display
+
+**Cross-Client Testing**:
+- Web UI: ✅ Works (FFprobe succeeds, playback intercepted cleanly)
+- iOS/tvOS (Swiftfin): ✅ Fixed - no longer crashes, FFprobe reads dummy video
+- Android: ✅ Should work (valid video file, standard FFprobe flow)
+- Other clients: ✅ Should work (all use same FFprobe → playback flow)
 
 ---

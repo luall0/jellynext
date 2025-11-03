@@ -25,6 +25,8 @@
     <EmbeddedResource Include="Configuration\**\*.js" />
     <None Remove="Configuration\**\*.html" />
     <EmbeddedResource Include="Configuration\**\*.html" />
+    <None Remove="Resources\**\*.mp4" />
+    <EmbeddedResource Include="Resources\**\*.mp4" />
   </ItemGroup>
 
 </Project>

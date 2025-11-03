@@ -15,10 +15,12 @@ public class VirtualLibraryManager
 {
     private const string VirtualLibraryFolderName = "jellynext-virtual";
     private const string StubFileExtension = ".strm";
+    private const string DummyVideoFileName = "dummy.mp4";
 
     private readonly ContentCacheService _cacheService;
     private readonly ILogger<VirtualLibraryManager> _logger;
     private string? _virtualLibraryPath;
+    private string? _dummyVideoPath;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualLibraryManager"/> class.
@@ -57,6 +59,9 @@ public class VirtualLibraryManager
             // Migrate old structure (clean up old .strm files in root)
             MigrateOldStructure();
 
+            // Create dummy video file for FFprobe compatibility
+            CreateDummyVideo();
+
             // Log setup instructions for each user
             LogSetupInstructions();
 
@@ -66,6 +71,60 @@ public class VirtualLibraryManager
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error initializing virtual library");
+        }
+    }
+
+    private void CreateDummyVideo()
+    {
+        if (string.IsNullOrEmpty(_virtualLibraryPath))
+        {
+            return;
+        }
+
+        try
+        {
+            _dummyVideoPath = Path.Combine(_virtualLibraryPath, DummyVideoFileName);
+
+            // Only create if it doesn't exist
+            if (File.Exists(_dummyVideoPath))
+            {
+                _logger.LogDebug("Dummy video already exists: {Path}", _dummyVideoPath);
+                return;
+            }
+
+            // Extract embedded dummy video from resources
+            var assembly = typeof(VirtualLibraryManager).Assembly;
+            var resourceName = $"{assembly.GetName().Name}.Resources.{DummyVideoFileName}";
+
+            _logger.LogInformation("Extracting embedded dummy video from resources...");
+
+            using (var resourceStream = assembly.GetManifestResourceStream(resourceName))
+            {
+                if (resourceStream == null)
+                {
+                    _logger.LogWarning("Embedded dummy video not found in resources: {ResourceName}", resourceName);
+                    return;
+                }
+
+                using (var fileStream = File.Create(_dummyVideoPath))
+                {
+                    resourceStream.CopyTo(fileStream);
+                }
+            }
+
+            if (File.Exists(_dummyVideoPath))
+            {
+                var fileSize = new FileInfo(_dummyVideoPath).Length;
+                _logger.LogInformation("Extracted dummy video file: {Path} (size: {Size} bytes)", _dummyVideoPath, fileSize);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to extract dummy video file");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not extract dummy video file - .strm files will use fallback URL");
         }
     }
 
@@ -265,7 +324,12 @@ public class VirtualLibraryManager
 
                     if (!File.Exists(stubFile))
                     {
-                        File.WriteAllText(stubFile, $"plugin://jellynext/movie/{item.TmdbId}");
+                        // Point to dummy video file for FFprobe compatibility
+                        // Playback interceptor detects virtual items by path, not file content
+                        var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
+                            ? _dummyVideoPath
+                            : "http://jellynext-placeholder/movie"; // Fallback if dummy video creation failed
+                        File.WriteAllText(stubFile, content);
                         _logger.LogDebug("Created stub file: {Title} ({Year})", item.Title, year);
                     }
                 }
@@ -309,7 +373,12 @@ public class VirtualLibraryManager
                     var stubFile = Path.Combine(showFolder, "tvshow.strm");
                     if (!File.Exists(stubFile))
                     {
-                        File.WriteAllText(stubFile, $"plugin://jellynext/show/{item.TvdbId}");
+                        // Point to dummy video file for FFprobe compatibility
+                        // Playback interceptor detects virtual items by path, not file content
+                        var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
+                            ? _dummyVideoPath
+                            : "http://jellynext-placeholder/show"; // Fallback if dummy video creation failed
+                        File.WriteAllText(stubFile, content);
                         _logger.LogDebug("Created show folder and stub: {Title} ({Year})", item.Title, year);
                     }
                 }

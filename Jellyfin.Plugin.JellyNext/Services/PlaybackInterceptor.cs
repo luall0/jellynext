@@ -59,7 +59,7 @@ public class PlaybackInterceptor : IHostedService
     {
         try
         {
-            if (e.Item == null || string.IsNullOrEmpty(e.Item.Path))
+            if (e.Item == null || string.IsNullOrEmpty(e.Item.Path) || e.Session == null)
             {
                 return;
             }
@@ -114,6 +114,47 @@ public class PlaybackInterceptor : IHostedService
                 tmdbId,
                 contentItem.Title,
                 contentItem.Year ?? DateTime.UtcNow.Year);
+
+            // Stop playback immediately
+            try
+            {
+                await _sessionManager.SendPlaystateCommand(
+                    null,
+                    e.Session.Id,
+                    new MediaBrowser.Model.Session.PlaystateRequest
+                    {
+                        Command = MediaBrowser.Model.Session.PlaystateCommand.Stop,
+                        ControllingUserId = e.Session.UserId.ToString()
+                    },
+                    CancellationToken.None);
+            }
+            catch (Exception stopEx)
+            {
+                _logger.LogWarning(stopEx, "Could not stop playback session");
+            }
+
+            // Send message to user
+            var message = result != null
+                ? $"{contentItem.Title} ({contentItem.Year}) has been added to your download queue and will appear in your library shortly."
+                : $"Failed to add {contentItem.Title} ({contentItem.Year}) to download queue. Please check your Radarr configuration.";
+
+            try
+            {
+                await _sessionManager.SendMessageCommand(
+                    null,
+                    e.Session.Id,
+                    new MediaBrowser.Model.Session.MessageCommand
+                    {
+                        Header = "JellyNext Download",
+                        Text = message,
+                        TimeoutMs = 5000
+                    },
+                    CancellationToken.None);
+            }
+            catch (Exception msgEx)
+            {
+                _logger.LogWarning(msgEx, "Could not send message to session");
+            }
 
             if (result != null)
             {
