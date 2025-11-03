@@ -35,5 +35,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         // Virtual library
         serviceCollection.AddSingleton<VirtualLibrary.VirtualLibraryManager>();
         serviceCollection.AddSingleton<VirtualLibrary.VirtualLibraryCreator>();
+
+        // Playback interception
+        serviceCollection.AddHostedService<PlaybackInterceptor>();
     }
 }

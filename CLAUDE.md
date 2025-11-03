@@ -112,10 +112,11 @@ Jellyfin.Plugin.JellyNext/
 │   └── JellyNextLibraryController.cs # REST API for virtual library content
 ├── Services/
 │   ├── TraktApi.cs               # Trakt API integration
-│   ├── RadarrService.cs          # Radarr API integration
+│   ├── RadarrService.cs          # Radarr API integration (test, add movies)
 │   ├── TmdbService.cs            # TMDB API key management (custom or Jellyfin's)
 │   ├── ContentCacheService.cs    # In-memory cache for synced content
-│   └── ContentSyncService.cs     # Orchestrates syncing across providers
+│   ├── ContentSyncService.cs     # Orchestrates syncing across providers
+│   └── PlaybackInterceptor.cs    # IHostedService for playback event monitoring
 ├── Providers/
 │   ├── IContentProvider.cs       # Interface for content providers
 │   └── RecommendationsProvider.cs # Trakt recommendations implementation
@@ -135,6 +136,7 @@ Jellyfin.Plugin.JellyNext/
 │   ├── TraktMovie.cs             # Trakt movie response
 │   ├── TraktShow.cs              # Trakt show response
 │   ├── TraktIds.cs               # External IDs (TMDB, IMDB, TVDB, etc)
+│   ├── RadarrMovie.cs            # Radarr movie (add/retrieve)
 │   ├── RadarrQualityProfile.cs   # Radarr quality profile
 │   ├── RadarrRootFolder.cs       # Radarr root folder
 │   ├── RadarrSystemStatus.cs     # Radarr system status
@@ -155,7 +157,8 @@ Jellyfin.Plugin.JellyNext/
 - **RadarrController**: REST endpoint for testing Radarr connection
 - **JellyNextLibraryController**: REST API for accessing virtual library content (recommendations queries)
 - **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls, recommendations fetching
-- **RadarrService**: Handles Radarr API interactions (test connection, retrieve profiles/folders)
+- **RadarrService**: Handles Radarr API interactions (test connection, retrieve profiles/folders, add movies)
+- **PlaybackInterceptor**: IHostedService that subscribes to session playback events, detects virtual item playback, triggers downloads
 - **TmdbService**: Manages TMDB API key (uses custom if provided, falls back to Jellyfin's via reflection)
 - **ContentCacheService**: In-memory per-user, per-provider cache with automatic expiration
 - **ContentSyncService**: Orchestrates syncing across all registered `IContentProvider` implementations
@@ -430,6 +433,59 @@ Jellyfin.Plugin.JellyNext/
 - JavaScript must use `result.Success`, `result.QualityProfiles`, etc. (not camelCase)
 - Root folder dropdown shows available space formatted as human-readable size
 - Connection can be re-tested to change profile/folder without re-entering credentials
+
+### ✅ Playback Interception for Movie Downloads
+**Architecture:**
+- `PlaybackInterceptor` - Hosted service that monitors playback events
+- Implements `IHostedService` for automatic startup with plugin
+- Registered in `PluginServiceRegistrator` as hosted service
+
+**How It Works:**
+1. Service subscribes to `ISessionManager.PlaybackStart` event on startup
+2. When user attempts to play any media, event handler checks if path contains "jellynext-virtual"
+3. If virtual item detected:
+   - Extracts TMDB ID from filename using regex: `\[tmdbid-(\d+)\]$`
+   - Extracts user ID from path using regex: `jellynext-virtual[/\\]([a-f0-9-]+)[/\\]`
+   - Looks up movie details from `ContentCacheService`
+   - Calls `RadarrService.AddMovieAsync()` to add movie to Radarr
+   - Logs success/failure
+4. Playback fails naturally (since .strm file has no valid content), but download is already triggered
+
+**Service Components:**
+- `PlaybackInterceptor(ISessionManager, RadarrService, ContentCacheService)` - Constructor with DI
+- `StartAsync()` - Subscribes to PlaybackStart event
+- `StopAsync()` - Unsubscribes from event
+- `OnPlaybackStart(object, PlaybackProgressEventArgs)` - Event handler for playback detection
+
+**Radarr Integration:**
+- `RadarrService.AddMovieAsync(tmdbId, title, year)` - Adds movie to Radarr
+  - Uses configured `RadarrUrl`, `RadarrApiKey`, `RadarrQualityProfileId`, `RadarrRootFolderPath`
+  - Checks if movie already exists in Radarr (avoids duplicates)
+  - Sets `Monitored = true` and `SearchForMovie = true` (triggers immediate search)
+  - Returns `RadarrMovie` on success, `null` on failure
+
+**Models:**
+- `RadarrMovie` - Represents movie in Radarr (id, title, tmdbId, qualityProfileId, rootFolderPath, monitored, addOptions)
+- `RadarrAddOptions` - Add options (searchForMovie)
+
+**Cross-Client Support:**
+- Works on all Jellyfin clients (Web, Android, iOS, TV, Kodi)
+- No client modifications required
+- Operates at server API level via session manager events
+- User experience: Click Play → Brief loading → Playback fails → Movie downloading in background
+
+**Error Handling:**
+- Validates TMDB ID extraction from filename
+- Validates user ID extraction from path
+- Checks if movie exists in cache before triggering download
+- Logs all errors (invalid path format, missing cache entry, Radarr API failures)
+- Graceful failure - invalid requests logged but don't crash plugin
+
+**Important Notes:**
+- Playback will fail for virtual items (expected behavior - .strm files have no media)
+- Download happens in background - user sees in Radarr activity
+- Future enhancement: Add user notifications when Jellyfin notification API is available
+- Only works for movies currently - TV shows support planned separately
 
 ## Core Workflows
 

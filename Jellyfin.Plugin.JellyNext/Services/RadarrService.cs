@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
@@ -88,6 +89,97 @@ public class RadarrService
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Adds a movie to Radarr.
+    /// </summary>
+    /// <param name="tmdbId">The TMDB ID of the movie.</param>
+    /// <param name="title">The movie title.</param>
+    /// <param name="year">The movie year.</param>
+    /// <returns>The added movie if successful, null otherwise.</returns>
+    public async Task<RadarrMovie?> AddMovieAsync(int tmdbId, string title, int year)
+    {
+        try
+        {
+            var config = Plugin.Instance?.Configuration;
+            if (config == null)
+            {
+                _logger.LogError("Plugin configuration is null");
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(config.RadarrUrl) || string.IsNullOrWhiteSpace(config.RadarrApiKey))
+            {
+                _logger.LogError("Radarr URL or API key not configured");
+                return null;
+            }
+
+            if (config.RadarrQualityProfileId <= 0)
+            {
+                _logger.LogError("Radarr quality profile not configured");
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(config.RadarrRootFolderPath))
+            {
+                _logger.LogError("Radarr root folder not configured");
+                return null;
+            }
+
+            using var httpClient = CreateRadarrClient(config.RadarrUrl, config.RadarrApiKey);
+
+            // Check if movie already exists in Radarr
+            var existingMovies = await httpClient.GetFromJsonAsync<List<RadarrMovie>>("/api/v3/movie");
+            var existingMovie = existingMovies?.FirstOrDefault(m => m.TmdbId == tmdbId);
+
+            if (existingMovie != null)
+            {
+                _logger.LogInformation("Movie already exists in Radarr: {Title} (TMDB: {TmdbId})", title, tmdbId);
+                return existingMovie;
+            }
+
+            // Create movie request
+            var movieRequest = new RadarrMovie
+            {
+                TmdbId = tmdbId,
+                Title = title,
+                Year = year,
+                QualityProfileId = config.RadarrQualityProfileId,
+                RootFolderPath = config.RadarrRootFolderPath,
+                Monitored = true,
+                AddOptions = new RadarrAddOptions
+                {
+                    SearchForMovie = true
+                }
+            };
+
+            // Add movie to Radarr
+            var response = await httpClient.PostAsJsonAsync("/api/v3/movie", movieRequest);
+            response.EnsureSuccessStatusCode();
+
+            var addedMovie = await response.Content.ReadFromJsonAsync<RadarrMovie>();
+
+            if (addedMovie != null)
+            {
+                _logger.LogInformation(
+                    "Successfully added movie to Radarr: {Title} (TMDB: {TmdbId})",
+                    title,
+                    tmdbId);
+            }
+
+            return addedMovie;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error adding movie to Radarr: {Title} (TMDB: {TmdbId})", title, tmdbId);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding movie to Radarr: {Title} (TMDB: {TmdbId})", title, tmdbId);
+            return null;
+        }
     }
 
     /// <summary>
