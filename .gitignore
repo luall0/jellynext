@@ -54,6 +54,9 @@ Thumbs.db
 # Plugin configuration (may contain API keys)
 *.log
 
+# Docker debug data
+docker-data/
+
 # Project planning files
 PROJECT.md
 VIRTUAL_LIBRARY.md

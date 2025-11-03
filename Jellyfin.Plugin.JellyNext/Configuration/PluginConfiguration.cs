@@ -22,6 +22,16 @@ public class PluginConfiguration : BasePluginConfiguration
     public string RadarrApiKey { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the Radarr Quality Profile ID.
+    /// </summary>
+    public int RadarrQualityProfileId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Radarr Root Folder Path.
+    /// </summary>
+    public string RadarrRootFolderPath { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the Sonarr URL.
     /// </summary>
     public string SonarrUrl { get; set; } = string.Empty;

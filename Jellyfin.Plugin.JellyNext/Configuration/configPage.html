@@ -86,6 +86,32 @@
                             <label class="inputLabel inputLabelUnfocused" for="RadarrApiKey">Radarr API Key:</label>
                             <input is="emby-input" type="text" id="RadarrApiKey" name="RadarrApiKey" />
                         </div>
+                        <div style="margin-top: 1em;">
+                            <button is="emby-button" type="button" id="TestRadarrBtn" class="raised button-submit">
+                                <span>Test Connection</span>
+                            </button>
+                        </div>
+                        <div id="RadarrConnectionStatus" style="margin-top: 1em; display: none;"></div>
+                        <div id="RadarrOptionsSection" style="display: none;">
+                            <div class="inputContainer" style="margin-top: 1em;">
+                                <label class="inputLabel inputLabelUnfocused" for="RadarrQualityProfile">Quality Profile:</label>
+                                <select is="emby-select" id="RadarrQualityProfile" name="RadarrQualityProfile">
+                                    <option value="">Select a quality profile...</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    Quality profile to use when downloading movies
+                                </div>
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="RadarrRootFolder">Root Folder:</label>
+                                <select is="emby-select" id="RadarrRootFolder" name="RadarrRootFolder">
+                                    <option value="">Select a root folder...</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    Folder where downloaded movies will be stored
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Sonarr Settings -->
@@ -151,7 +177,9 @@
             var JellyNextConfig = {
                 pluginUniqueId: 'a4df60c5-6ab4-412a-8f79-2cab93fb2bc5',
                 currentUserGuid: null,
-                authCheckInterval: null
+                authCheckInterval: null,
+                radarrProfiles: [],
+                radarrFolders: []
             };
 
             // Load users into dropdown
@@ -302,6 +330,95 @@
                 checkAuthorizationStatus(userGuid);
             });
 
+            // Test Radarr connection
+            document.getElementById('TestRadarrBtn').addEventListener('click', function () {
+                var radarrUrl = document.getElementById('RadarrUrl').value;
+                var radarrApiKey = document.getElementById('RadarrApiKey').value;
+
+                if (!radarrUrl || !radarrApiKey) {
+                    Dashboard.alert('Please enter Radarr URL and API Key first');
+                    return;
+                }
+
+                Dashboard.showLoadingMsg();
+                var statusDiv = document.getElementById('RadarrConnectionStatus');
+                var optionsSection = document.getElementById('RadarrOptionsSection');
+                statusDiv.style.display = 'none';
+                optionsSection.style.display = 'none';
+
+                var encodedUrl = encodeURIComponent(radarrUrl);
+                var encodedApiKey = encodeURIComponent(radarrApiKey);
+
+                ApiClient.fetch({
+                    type: 'GET',
+                    url: ApiClient.getUrl('JellyNext/Radarr/TestConnection?radarrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (result) {
+                    Dashboard.hideLoadingMsg();
+                    statusDiv.style.display = 'block';
+
+                    if (result.Success) {
+                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #52B54B;">✓ Successfully connected to Radarr v' + result.Version + '</div>';
+
+                        JellyNextConfig.radarrProfiles = result.QualityProfiles || [];
+                        JellyNextConfig.radarrFolders = result.RootFolders || [];
+
+                        populateRadarrOptions();
+                        optionsSection.style.display = 'block';
+                    } else {
+                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + (result.ErrorMessage || 'Unknown error') + '</div>';
+                        optionsSection.style.display = 'none';
+                    }
+                }).catch(function (error) {
+                    Dashboard.hideLoadingMsg();
+                    statusDiv.style.display = 'block';
+                    statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + error.message + '</div>';
+                    optionsSection.style.display = 'none';
+                });
+            });
+
+            // Populate Radarr quality profiles and root folders
+            function populateRadarrOptions() {
+                var profileSelect = document.getElementById('RadarrQualityProfile');
+                var folderSelect = document.getElementById('RadarrRootFolder');
+
+                profileSelect.innerHTML = '<option value="">Select a quality profile...</option>';
+                JellyNextConfig.radarrProfiles.forEach(function (profile) {
+                    var option = document.createElement('option');
+                    option.value = profile.id;
+                    option.textContent = profile.name;
+                    profileSelect.appendChild(option);
+                });
+
+                folderSelect.innerHTML = '<option value="">Select a root folder...</option>';
+                JellyNextConfig.radarrFolders.forEach(function (folder) {
+                    var option = document.createElement('option');
+                    option.value = folder.path;
+                    option.textContent = folder.path + ' (' + formatBytes(folder.freeSpace) + ' free)';
+                    folderSelect.appendChild(option);
+                });
+
+                // Try to restore previously selected values
+                ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
+                    if (config.RadarrQualityProfileId) {
+                        profileSelect.value = config.RadarrQualityProfileId;
+                    }
+                    if (config.RadarrRootFolderPath) {
+                        folderSelect.value = config.RadarrRootFolderPath;
+                    }
+                });
+            }
+
+            // Format bytes to human-readable size
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 B';
+                var k = 1024;
+                var sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                var i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
             // Load configuration on page show
             document.getElementById('JellyNextConfigPage').addEventListener('pageshow', function () {
                 Dashboard.showLoadingMsg();
@@ -319,6 +436,16 @@
                     document.getElementById('IgnoreCollected').checked = config.IgnoreCollected !== false;
                     document.getElementById('IgnoreWatchlisted').checked = config.IgnoreWatchlisted === true;
                     document.getElementById('CacheExpirationHours').value = config.CacheExpirationHours || 6;
+
+                    // If Radarr is configured, show a hint to test connection to see options
+                    if (config.RadarrUrl && config.RadarrApiKey) {
+                        if (config.RadarrQualityProfileId && config.RadarrRootFolderPath) {
+                            var statusDiv = document.getElementById('RadarrConnectionStatus');
+                            statusDiv.style.display = 'block';
+                            statusDiv.innerHTML = '<div class="fieldDescription" style="color: #0088cc;">ℹ Radarr is configured. Click "Test Connection" to modify quality profile or root folder.</div>';
+                        }
+                    }
+
                     Dashboard.hideLoadingMsg();
                 });
             });
@@ -332,6 +459,17 @@
                     config.TmdbApiKey = document.getElementById('TmdbApiKey').value;
                     config.RadarrUrl = document.getElementById('RadarrUrl').value;
                     config.RadarrApiKey = document.getElementById('RadarrApiKey').value;
+
+                    // Save Radarr quality profile and root folder if selected
+                    var qualityProfileId = document.getElementById('RadarrQualityProfile').value;
+                    var rootFolderPath = document.getElementById('RadarrRootFolder').value;
+                    if (qualityProfileId) {
+                        config.RadarrQualityProfileId = parseInt(qualityProfileId);
+                    }
+                    if (rootFolderPath) {
+                        config.RadarrRootFolderPath = rootFolderPath;
+                    }
+
                     config.SonarrUrl = document.getElementById('SonarrUrl').value;
                     config.SonarrApiKey = document.getElementById('SonarrApiKey').value;
                     config.IgnoreCollected = document.getElementById('IgnoreCollected').checked;

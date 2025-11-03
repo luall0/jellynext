@@ -108,9 +108,11 @@ Jellyfin.Plugin.JellyNext/
 │   └── configPage.html           # Admin web UI (OAuth + config)
 ├── Api/
 │   ├── TraktController.cs        # OAuth endpoints
+│   ├── RadarrController.cs       # Radarr test connection endpoint
 │   └── JellyNextLibraryController.cs # REST API for virtual library content
 ├── Services/
 │   ├── TraktApi.cs               # Trakt API integration
+│   ├── RadarrService.cs          # Radarr API integration
 │   ├── TmdbService.cs            # TMDB API key management (custom or Jellyfin's)
 │   ├── ContentCacheService.cs    # In-memory cache for synced content
 │   └── ContentSyncService.cs     # Orchestrates syncing across providers
@@ -133,6 +135,10 @@ Jellyfin.Plugin.JellyNext/
 │   ├── TraktMovie.cs             # Trakt movie response
 │   ├── TraktShow.cs              # Trakt show response
 │   ├── TraktIds.cs               # External IDs (TMDB, IMDB, TVDB, etc)
+│   ├── RadarrQualityProfile.cs   # Radarr quality profile
+│   ├── RadarrRootFolder.cs       # Radarr root folder
+│   ├── RadarrSystemStatus.cs     # Radarr system status
+│   ├── RadarrTestConnectionResponse.cs # Radarr test result
 │   ├── ContentItem.cs            # Unified content representation
 │   └── ContentType.cs            # Movie/Show enum
 ├── Helpers/
@@ -143,11 +149,13 @@ Jellyfin.Plugin.JellyNext/
 
 ### Key Plugin Components
 - **Plugin.cs**: Main entry point, inherits `BasePlugin<PluginConfiguration>`, tracks OAuth polling tasks, exposes `IServerApplicationHost`
-- **PluginConfiguration**: Stores global settings (Radarr/Sonarr URLs/keys, optional TMDB key, cache expiration, ignore filters, per-user TraktUser array)
+- **PluginConfiguration**: Stores global settings (Radarr/Sonarr URLs/keys/profiles/folders, optional TMDB key, cache expiration, ignore filters, per-user TraktUser array)
 - **PluginServiceRegistrator**: Registers all services and content providers in DI container
 - **TraktController**: REST endpoints for OAuth (authorize, deauthorize, status check)
+- **RadarrController**: REST endpoint for testing Radarr connection
 - **JellyNextLibraryController**: REST API for accessing virtual library content (recommendations queries)
 - **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls, recommendations fetching
+- **RadarrService**: Handles Radarr API interactions (test connection, retrieve profiles/folders)
 - **TmdbService**: Manages TMDB API key (uses custom if provided, falls back to Jellyfin's via reflection)
 - **ContentCacheService**: In-memory per-user, per-provider cache with automatic expiration
 - **ContentSyncService**: Orchestrates syncing across all registered `IContentProvider` implementations
@@ -375,6 +383,53 @@ Jellyfin.Plugin.JellyNext/
 - ✅ Movies recommendations support
 - ✅ Shows recommendations support
 - ⏳ Watchlist support (future: new content provider)
+
+### ✅ Radarr Configuration with Test Connection
+**Architecture:**
+- Admin-configured Radarr settings stored in `PluginConfiguration`
+- Interactive test connection validates credentials and retrieves available options
+- `RadarrService` handles all Radarr API interactions
+- `RadarrController` exposes REST endpoint for frontend
+
+**Configuration Properties:**
+- `RadarrUrl` - Base URL (e.g., `http://radarr:7878`)
+- `RadarrApiKey` - API key from Radarr settings
+- `RadarrQualityProfileId` - Selected quality profile ID
+- `RadarrRootFolderPath` - Selected root folder path
+
+**Models:**
+- `RadarrQualityProfile` - Profile info (id, name)
+- `RadarrRootFolder` - Folder info (id, path, freeSpace)
+- `RadarrSystemStatus` - System info (version)
+- `RadarrTestConnectionResponse` - Test result with profiles and folders
+
+**Service Methods:**
+- `RadarrService.TestConnectionAsync(url, apiKey)` - Validates connection and retrieves options
+  - Calls `/api/v3/system/status` - Verifies connection
+  - Calls `/api/v3/qualityprofile` - Gets available profiles
+  - Calls `/api/v3/rootfolder` - Gets available folders
+  - Returns `RadarrTestConnectionResponse` with all data
+
+**API Endpoint:**
+- `GET /JellyNext/Radarr/TestConnection?radarrUrl={url}&apiKey={key}` - Test connection
+
+**Configuration UI Flow:**
+1. Admin enters Radarr URL and API key
+2. Clicks "Test Connection" button
+3. Frontend calls test endpoint with credentials
+4. Backend validates and retrieves profiles/folders
+5. Success: Shows version + populates quality profile and root folder dropdowns
+6. Failure: Shows error message
+7. Admin selects preferred profile and folder
+8. Clicks "Save Configuration" to persist settings
+9. UI pre-selects saved values when testing connection again
+
+**Important Notes:**
+- Uses `NamedClient.Default` HTTP client (same as TraktApi)
+- API returns PascalCase JSON (C# default serialization)
+- JavaScript must use `result.Success`, `result.QualityProfiles`, etc. (not camelCase)
+- Root folder dropdown shows available space formatted as human-readable size
+- Connection can be re-tested to change profile/folder without re-entering credentials
 
 ## Core Workflows
 

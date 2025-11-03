@@ -25,6 +25,21 @@ services:
       - "4024:4024"   # Remote debugger port
     restart: unless-stopped
 
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr-jellynext-debug
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=Etc/UTC
+    volumes:
+      - ./docker-data/radarr/config:/config
+      - ./docker-data/radarr/downloads:/downloads
+      - ./docker-data/radarr/movies:/movies
+    ports:
+      - "7878:7878"
+    restart: unless-stopped
+
 volumes:
   jellyfin-config:
   jellyfin-cache:
