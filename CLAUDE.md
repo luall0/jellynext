@@ -116,7 +116,8 @@ Jellyfin.Plugin.JellyNext/
 │   ├── TmdbService.cs            # TMDB API key management (custom or Jellyfin's)
 │   ├── ContentCacheService.cs    # In-memory cache for synced content
 │   ├── ContentSyncService.cs     # Orchestrates syncing across providers
-│   └── PlaybackInterceptor.cs    # IHostedService for playback event monitoring
+│   ├── PlaybackInterceptor.cs    # IHostedService for playback event monitoring
+│   └── StartupSyncService.cs     # IHostedService for triggering sync at startup
 ├── Providers/
 │   ├── IContentProvider.cs       # Interface for content providers
 │   └── RecommendationsProvider.cs # Trakt recommendations implementation
@@ -159,6 +160,7 @@ Jellyfin.Plugin.JellyNext/
 - **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls, recommendations fetching
 - **RadarrService**: Handles Radarr API interactions (test connection, retrieve profiles/folders, add movies)
 - **PlaybackInterceptor**: IHostedService that subscribes to session playback events, detects virtual item playback, triggers downloads
+- **StartupSyncService**: IHostedService that triggers content sync at plugin startup (waits 5 seconds for initialization)
 - **TmdbService**: Manages TMDB API key (uses custom if provided, falls back to Jellyfin's via reflection)
 - **ContentCacheService**: In-memory per-user, per-provider cache with automatic expiration
 - **ContentSyncService**: Orchestrates syncing across all registered `IContentProvider` implementations
@@ -294,15 +296,23 @@ Jellyfin.Plugin.JellyNext/
 ### ✅ Modular Content Sync System
 **Architecture:**
 - `ContentSyncScheduledTask` - Jellyfin scheduled task (appears in Dashboard → Scheduled Tasks)
-- Default trigger: every 6 hours (user-configurable in Dashboard)
+- Default triggers: at startup + every 6 hours (user-configurable in Dashboard)
 - `ContentSyncService.SyncAllAsync()` - Syncs all users across all registered providers
 - Per-provider error isolation - one failure doesn't break entire sync
+- Automatic library scan after sync - triggers Jellyfin scan for all virtual libraries to update UI
 
 **Caching:**
 - `ContentCacheService` - In-memory cache per user per provider
 - `CacheExpirationHours` config (default: 6 hours) - Controls data freshness
 - Cache serves instant results for virtual library browsing
 - Protects against Trakt API rate limits
+
+**Sync Workflow:**
+1. Fetch content from all providers for all users (e.g., Trakt recommendations)
+2. Update in-memory cache with fresh data
+3. Refresh .strm stub files in all user directories
+4. Trigger Jellyfin library scan to detect new/removed items
+5. Virtual libraries update in UI automatically
 
 **Current Providers:**
 - `RecommendationsProvider` - Fetches movie + show recommendations (up to 50 each)
@@ -332,9 +342,10 @@ Jellyfin.Plugin.JellyNext/
 
 **Stub File System:**
 - **Format**: `Title (Year) [tmdbid-ID].strm` (e.g., `Thor (2011) [tmdbid-10195].strm`)
-- **Content**: `plugin://jellynext/movie/{tmdbId}` URL (not currently used but standard format)
+- **Content**: Points to dummy.mp4 path for FFprobe compatibility
 - **Why .strm**: Jellyfin recognizes .strm as streaming content and skips FFprobe (prevents errors)
 - **Isolation**: Each user's files in separate directory, no cross-user data leakage
+- **Empty directory handling**: `.keep` placeholder file maintained in all directories to prevent Jellyfin from ignoring empty recommendation folders
 
 **Resolver Integration:**
 - `JellyNextResolver` implements `IItemResolver` with `ResolverPriority.Plugin`
@@ -554,13 +565,27 @@ Jellyfin.Plugin.JellyNext/
 
 ### Content Sync Architecture
 - **Scheduled task** (`ContentSyncScheduledTask`) registered with Jellyfin's task manager
-- `GetDefaultTriggers()` sets initial 6-hour interval (user can change in Dashboard)
+- **Startup sync** via `StartupSyncService` (IHostedService):
+  - Runs automatically on plugin startup (waits 5 seconds for Jellyfin initialization)
+  - Finds and executes ContentSyncScheduledTask programmatically via `ITaskManager`
+  - More reliable than `TriggerStartup` (which only works on first task registration)
+  - Runs in background, doesn't block server startup
+- **Interval trigger**: Default 6 hours (user can change in Dashboard)
+- `GetDefaultTriggers()` returns only interval trigger (startup handled by hosted service)
 - **Cache expiration** is separate from sync schedule (prevents indefinitely stale data)
 - Cache serves instant responses when browsing virtual libraries
 - Sync refreshes cache on schedule or manual trigger
+- **Automatic library scan**: After sync completes, scans only virtual libraries (not all libraries!)
+  - Identifies virtual libraries by checking if path contains "jellynext-virtual"
+  - For each virtual library: `FindByPath()` → `Folder.ValidateChildren()` for that specific library
+  - Uses `MetadataRefreshOptions` with `ReplaceAllMetadata = false` (only scans for new/removed items)
+  - Scan is best-effort - errors logged as warnings, don't block sync
+  - Ensures new/removed recommendations appear in UI without manual scan
+  - Much more efficient than scanning all libraries
 
 ### Virtual Library Stub Files (Per-User Architecture)
 - **Must use .strm extension**: Jellyfin recognizes .strm as streaming content and skips FFprobe
+- **Empty directory handling**: Always maintain a `.keep` file in each content directory - Jellyfin refuses to scan empty directories and will remove libraries pointing to empty folders
 - **Different structures for movies vs shows**:
   - **Movies**: Flat .strm files in root directory
     - Format: `Title (Year) [tmdbid-ID].strm`
@@ -592,15 +617,17 @@ Jellyfin.Plugin.JellyNext/
 - File is empty → FFprobe fails with null streams/format
 
 **Solution - Embedded Dummy Video File**:
-- **Embed minimal valid video** - Plugin includes pre-generated `dummy.mp4` (2.3KB, 1-second black video, 320x240) as embedded resource
+- **Embed minimal valid video** - Plugin includes pre-generated `dummy.mp4` (~2MB, 1-hour black video, 2x2 pixels) as embedded resource
 - **Extract on initialization** - Copies embedded video from assembly to plugin data directory once
 - **Point .strm files to dummy** - All .strm files contain absolute path to dummy video: `/path/to/jellynext-virtual/dummy.mp4`
 - **FFprobe succeeds** - FFprobe can read the dummy video and extract valid stream info (h264 video, no audio)
 - **Playback still intercepted** - PlaybackInterceptor detects by path pattern `jellynext-virtual`, not file content
 - **Fallback to HTTP** - If extraction fails, falls back to `http://jellynext-placeholder/` URL
+- **Prevents "watched" status** - 1-hour duration ensures brief playback interception never reaches Jellyfin's 5% threshold (3 minutes) for marking content as resumable/watched
 
 **Implementation Details**:
-- `Resources/dummy.mp4` - Pre-generated minimal MP4 (320x240, 1 second, h264) embedded in plugin assembly
+- `Resources/dummy.mp4` - Pre-generated minimal MP4 (2x2, 1 hour, h264, CRF 51) embedded in plugin assembly
+- Video specs: 2x2 resolution (minimum for H.264 yuv420p), 25fps, ~4.5 kbits/s bitrate
 - `VirtualLibraryManager.CreateDummyVideo()` - Extracts embedded resource to plugin data directory
 - Extraction process:
   1. Check if `dummy.mp4` already exists in plugin data directory
@@ -616,7 +643,8 @@ Jellyfin.Plugin.JellyNext/
 - **All clients happy** - tvOS/iOS apps no longer crash because FFprobe succeeds
 - **Metadata from filename** - Resolver still extracts IDs from filename patterns (TMDB/TVDB IDs in brackets)
 - **Playback interception works** - Detects by path containing "jellynext-virtual", not by analyzing file content
-- **Minimal overhead** - Tiny 1-second video (~10KB), created once, shared by all virtual items
+- **Minimal size** - Highly compressed 2x2 black video (~2MB for 1 hour)
+- **No unwanted tracking** - Since playback stops in <1 second and Jellyfin needs 5% (3 minutes) to mark as resumable, virtual items never show "Resume" or get marked as watched
 - **Dummy runtime still set** - Resolver adds `RunTimeTicks = 90 * TimeSpan.TicksPerMinute` for UI display
 
 **Cross-Client Testing**:

@@ -16,6 +16,7 @@ public class VirtualLibraryManager
     private const string VirtualLibraryFolderName = "jellynext-virtual";
     private const string StubFileExtension = ".strm";
     private const string DummyVideoFileName = "dummy.mp4";
+    private const string KeepFileName = ".keep";
 
     private readonly ContentCacheService _cacheService;
     private readonly ILogger<VirtualLibraryManager> _logger;
@@ -272,6 +273,14 @@ public class VirtualLibraryManager
             {
                 Directory.CreateDirectory(userPath);
                 _logger.LogInformation("Created directory: {Path}", userPath);
+            }
+
+            // Create/maintain .keep file to prevent Jellyfin from ignoring empty directories
+            var keepFile = Path.Combine(userPath, KeepFileName);
+            if (!File.Exists(keepFile))
+            {
+                File.WriteAllText(keepFile, "This file ensures Jellyfin recognizes this directory even when empty.");
+                _logger.LogDebug("Created .keep file: {Path}", keepFile);
             }
 
             var providerName = VirtualLibraryContentTypeHelper.GetProviderName(contentType);
