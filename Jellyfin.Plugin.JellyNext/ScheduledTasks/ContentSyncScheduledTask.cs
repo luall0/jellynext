@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.JellyNext.Services;
+using Jellyfin.Plugin.JellyNext.VirtualLibrary;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -15,18 +16,25 @@ public class ContentSyncScheduledTask : IScheduledTask
 {
     private readonly ILogger<ContentSyncScheduledTask> _logger;
     private readonly ContentSyncService _syncService;
+    private readonly VirtualLibraryManager _virtualLibraryManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ContentSyncScheduledTask"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="syncService">The content sync service.</param>
+    /// <param name="virtualLibraryManager">The virtual library manager.</param>
     public ContentSyncScheduledTask(
         ILogger<ContentSyncScheduledTask> logger,
-        ContentSyncService syncService)
+        ContentSyncService syncService,
+        VirtualLibraryManager virtualLibraryManager)
     {
         _logger = logger;
         _syncService = syncService;
+        _virtualLibraryManager = virtualLibraryManager;
+
+        // Initialize virtual library on first construction
+        _virtualLibraryManager.Initialize();
     }
 
     /// <inheritdoc />
@@ -50,6 +58,10 @@ public class ContentSyncScheduledTask : IScheduledTask
         {
             progress?.Report(0);
             await _syncService.SyncAllAsync(cancellationToken);
+            progress?.Report(80);
+
+            // Refresh virtual library stub files after sync
+            _virtualLibraryManager.RefreshStubFiles();
             progress?.Report(100);
 
             _logger.LogInformation("Scheduled content sync completed successfully");
