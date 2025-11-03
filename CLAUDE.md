@@ -107,7 +107,8 @@ Jellyfin.Plugin.JellyNext/
 │   ├── PluginConfiguration.cs   # Global plugin settings
 │   └── configPage.html           # Admin web UI (OAuth + config)
 ├── Api/
-│   └── TraktController.cs        # OAuth endpoints
+│   ├── TraktController.cs        # OAuth endpoints
+│   └── JellyNextLibraryController.cs # REST API for virtual library content
 ├── Services/
 │   ├── TraktApi.cs               # Trakt API integration
 │   ├── TmdbService.cs            # TMDB API key management (custom or Jellyfin's)
@@ -116,6 +117,11 @@ Jellyfin.Plugin.JellyNext/
 ├── Providers/
 │   ├── IContentProvider.cs       # Interface for content providers
 │   └── RecommendationsProvider.cs # Trakt recommendations implementation
+├── Resolvers/
+│   └── JellyNextResolver.cs      # IItemResolver for .strm stub files
+├── VirtualLibrary/
+│   ├── VirtualLibraryManager.cs  # Creates/manages .strm stub files
+│   └── VirtualLibraryCreator.cs  # Initializes virtual library on startup
 ├── ScheduledTasks/
 │   └── ContentSyncScheduledTask.cs # Jellyfin scheduled task for syncing
 ├── Models/
@@ -139,12 +145,16 @@ Jellyfin.Plugin.JellyNext/
 - **PluginConfiguration**: Stores global settings (Radarr/Sonarr URLs/keys, optional TMDB key, cache expiration, ignore filters, per-user TraktUser array)
 - **PluginServiceRegistrator**: Registers all services and content providers in DI container
 - **TraktController**: REST endpoints for OAuth (authorize, deauthorize, status check)
+- **JellyNextLibraryController**: REST API for accessing virtual library content (recommendations queries)
 - **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls, recommendations fetching
 - **TmdbService**: Manages TMDB API key (uses custom if provided, falls back to Jellyfin's via reflection)
 - **ContentCacheService**: In-memory per-user, per-provider cache with automatic expiration
 - **ContentSyncService**: Orchestrates syncing across all registered `IContentProvider` implementations
 - **IContentProvider**: Modular interface for content sources (recommendations, watchlist, trending, etc.)
-- **ContentSyncScheduledTask**: Jellyfin scheduled task (configurable in Dashboard)
+- **ContentSyncScheduledTask**: Jellyfin scheduled task (configurable in Dashboard), triggers virtual library refresh
+- **JellyNextResolver**: IItemResolver that intercepts .strm stub files and converts them to Movie objects with metadata
+- **VirtualLibraryManager**: Creates and manages .strm stub files for recommendations in plugin data directory
+- **VirtualLibraryCreator**: Initializes virtual library directory on plugin startup
 
 ## Key Conventions
 
@@ -285,6 +295,45 @@ Jellyfin.Plugin.JellyNext/
 **Current Providers:**
 - `RecommendationsProvider` - Fetches movie + show recommendations (up to 50 each)
 
+### ✅ Native Virtual Library for Recommendations
+**Architecture:**
+- Creates a Jellyfin-native virtual library that works in all clients without custom UI
+- Uses .strm stub files as a bridge between cached recommendations and Jellyfin's item system
+- Full metadata resolution via TMDB provider IDs (posters, descriptions, cast)
+
+**Stub File System:**
+- **Location**: `<plugin-data>/jellynext-virtual/` directory
+- **Format**: `Title (Year) [tmdbid-ID].strm` (e.g., `Thor (2011) [tmdbid-10195].strm`)
+- **Content**: `plugin://jellynext/movie/{tmdbId}` URL (not currently used but standard format)
+- **Why .strm**: Jellyfin recognizes .strm as streaming content and skips FFprobe (prevents errors)
+
+**Resolver Integration:**
+- `JellyNextResolver` implements `IItemResolver` with `ResolverPriority.Plugin`
+- Intercepts .strm files in `jellynext-virtual` folder during library scans
+- Extracts TMDB ID from filename using regex: `\[tmdbid-(\d+)\]$`
+- Looks up movie details in ContentCacheService
+- Creates Movie object with proper metadata and provider IDs
+- Sets TMDB/IMDB ProviderIds for metadata lookup by Jellyfin's metadata providers
+
+**Automatic Sync:**
+- `VirtualLibraryManager.RefreshStubFiles()` called after each content sync
+- Creates new .strm files for new recommendations
+- Removes old .strm files for removed recommendations
+- File naming includes title/year for human readability and proper Jellyfin parsing
+
+**Setup Process:**
+1. Plugin creates `jellynext-virtual` directory on startup (logs full path)
+2. Sync task populates directory with .strm stub files
+3. Admin adds directory as Movies library in Jellyfin Dashboard
+4. Jellyfin scans library, resolver converts stubs to Movie objects
+5. Metadata providers fetch posters/info using TMDB IDs
+6. Movies appear in all clients with full metadata
+
+**Current Limitations:**
+- Only serves recommendations for admin user (first linked Trakt account)
+- Per-user virtual libraries not yet implemented (planned: separate folder per user)
+- Shows recommendations cached but not yet exposed in virtual library (movies only)
+
 ## Core Workflows
 
 ### Initial Setup (Admin)
@@ -343,5 +392,15 @@ Jellyfin.Plugin.JellyNext/
 - **Cache expiration** is separate from sync schedule (prevents indefinitely stale data)
 - Cache serves instant responses when browsing virtual libraries
 - Sync refreshes cache on schedule or manual trigger
+
+### Virtual Library Stub Files
+- **Must use .strm extension**: Jellyfin recognizes .strm as streaming content and skips FFprobe
+- **Filename format critical**: `Title (Year) [tmdbid-ID].strm` format required for proper metadata resolution
+- **Title/Year parsing**: Jellyfin's metadata providers parse title and year from filename before using TMDB ID
+- **Regex extraction**: Resolver uses `\[tmdbid-(\d+)\]$` to extract TMDB ID from filename
+- **Sanitize filenames**: Remove invalid characters from movie titles (replace with underscore)
+- **One-time library setup**: User must manually add `jellynext-virtual` folder as Movies library in Jellyfin once
+- **Resolver specificity**: Only intercepts .strm files containing `jellynext-virtual` in path (avoids interfering with other .strm files)
+- **Provider IDs essential**: Must set both TMDB and IMDB ProviderIds on Movie object for metadata to resolve
 
 ---
