@@ -120,8 +120,9 @@ Jellyfin.Plugin.JellyNext/
 ├── Resolvers/
 │   └── JellyNextResolver.cs      # IItemResolver for .strm stub files
 ├── VirtualLibrary/
-│   ├── VirtualLibraryManager.cs  # Creates/manages .strm stub files
-│   └── VirtualLibraryCreator.cs  # Initializes virtual library on startup
+│   ├── VirtualLibraryManager.cs  # Creates/manages per-user .strm stub files
+│   ├── VirtualLibraryCreator.cs  # Initializes virtual library on startup
+│   └── VirtualLibraryContentType.cs # Content type enum and helpers
 ├── ScheduledTasks/
 │   └── ContentSyncScheduledTask.cs # Jellyfin scheduled task for syncing
 ├── Models/
@@ -295,44 +296,85 @@ Jellyfin.Plugin.JellyNext/
 **Current Providers:**
 - `RecommendationsProvider` - Fetches movie + show recommendations (up to 50 each)
 
-### ✅ Native Virtual Library for Recommendations
+### ✅ Per-User Native Virtual Libraries
 **Architecture:**
-- Creates a Jellyfin-native virtual library that works in all clients without custom UI
+- Creates Jellyfin-native virtual libraries that work in all clients without custom UI
+- **Per-user isolation**: Each user has their own directory with personalized recommendations
 - Uses .strm stub files as a bridge between cached recommendations and Jellyfin's item system
 - Full metadata resolution via TMDB provider IDs (posters, descriptions, cast)
 
+**Directory Structure:**
+- **Base**: `<plugin-data>/jellynext-virtual/`
+- **Per-user format**: `jellynext-virtual/[userId]/[content-type]/`
+- **Example**: `jellynext-virtual/12345678-1234-1234-1234-123456789012/movies_recommendations/`
+- **Content types**: `movies_recommendations`, `shows_recommendations`, `watchlist_movies`, `watchlist_shows`
+- **Scalable**: Easy to add new content types (trending, calendar, etc.)
+
+**Content Type System:**
+- `VirtualLibraryContentType` enum defines available content types
+- `VirtualLibraryContentTypeHelper` provides standardized naming/mapping:
+  - `GetDirectoryName()`: "movies_recommendations"
+  - `GetProviderName()`: "recommendations"
+  - `GetDisplayName()`: "Movie Recommendations"
+  - `GetMediaType()`: "Movies" or "Shows"
+  - `TryParseDirectoryName()`: Parse directory name back to enum
+
 **Stub File System:**
-- **Location**: `<plugin-data>/jellynext-virtual/` directory
 - **Format**: `Title (Year) [tmdbid-ID].strm` (e.g., `Thor (2011) [tmdbid-10195].strm`)
 - **Content**: `plugin://jellynext/movie/{tmdbId}` URL (not currently used but standard format)
 - **Why .strm**: Jellyfin recognizes .strm as streaming content and skips FFprobe (prevents errors)
+- **Isolation**: Each user's files in separate directory, no cross-user data leakage
 
 **Resolver Integration:**
 - `JellyNextResolver` implements `IItemResolver` with `ResolverPriority.Plugin`
 - Intercepts .strm files in `jellynext-virtual` folder during library scans
+- Extracts **userId** and **content type** from path using regex: `@"jellynext-virtual[/\\]([a-f0-9-]+)[/\\]([^/\\]+)[/\\]"`
 - Extracts TMDB ID from filename using regex: `\[tmdbid-(\d+)\]$`
-- Looks up movie details in ContentCacheService
+- Looks up movie details in ContentCacheService **for specific user**
 - Creates Movie object with proper metadata and provider IDs
 - Sets TMDB/IMDB ProviderIds for metadata lookup by Jellyfin's metadata providers
 
 **Automatic Sync:**
-- `VirtualLibraryManager.RefreshStubFiles()` called after each content sync
+- `VirtualLibraryManager.RefreshStubFiles()` syncs **all users** (not just admin)
+- `VirtualLibraryManager.RefreshStubFilesForUser(userId, contentType)` syncs specific user/type
 - Creates new .strm files for new recommendations
 - Removes old .strm files for removed recommendations
 - File naming includes title/year for human readability and proper Jellyfin parsing
+- Per-user directories created automatically on first sync
+
+**Migration from Single-User:**
+- `MigrateOldStructure()` detects old .strm files in root directory
+- Automatically deletes old files on first run after upgrade
+- Logs migration progress
+- New per-user structure created cleanly
+
+**Library Organization:**
+- **One library per content type per user** (not one library per user!)
+- Example for one user:
+  - Library 1: "admin's Movies Recommendations" → `jellynext-virtual/[userId]/movies_recommendations/`
+  - Library 2: "admin's Shows Recommendations" → `jellynext-virtual/[userId]/shows_recommendations/`
+  - Library 3: "admin's Movie Watchlist" → `jellynext-virtual/[userId]/watchlist_movies/`
+- This allows granular control and better organization in Jellyfin UI
+- Each library can have different visibility/permissions
 
 **Setup Process:**
-1. Plugin creates `jellynext-virtual` directory on startup (logs full path)
-2. Sync task populates directory with .strm stub files
-3. Admin adds directory as Movies library in Jellyfin Dashboard
-4. Jellyfin scans library, resolver converts stubs to Movie objects
-5. Metadata providers fetch posters/info using TMDB IDs
-6. Movies appear in all clients with full metadata
+1. Plugin creates `jellynext-virtual` base directory on startup
+2. Logs per-user, per-content-type setup instructions with exact paths
+3. Sync task populates per-user, per-content-type directories with .strm stub files
+4. Admin creates SEPARATE library for EACH content type:
+   - Add "admin's Movies Recommendations" → Movies library → `jellynext-virtual/[userId]/movies_recommendations/`
+   - Add "admin's Shows Recommendations" → Shows library → `jellynext-virtual/[userId]/shows_recommendations/`
+   - (Repeat for each user and content type)
+5. Jellyfin scans each library independently
+6. Resolver converts stubs to Movie/Show objects with user context
+7. Metadata providers fetch posters/info using TMDB IDs
+8. Content appears in respective libraries with full metadata
 
-**Current Limitations:**
-- Only serves recommendations for admin user (first linked Trakt account)
-- Per-user virtual libraries not yet implemented (planned: separate folder per user)
-- Shows recommendations cached but not yet exposed in virtual library (movies only)
+**Current Implementation:**
+- ✅ Full per-user isolation
+- ✅ Movies recommendations support
+- ✅ Shows recommendations support
+- ⏳ Watchlist support (future: new content provider)
 
 ## Core Workflows
 
@@ -352,11 +394,12 @@ Jellyfin.Plugin.JellyNext/
 5. Tokens stored in `PluginConfiguration.TraktUsers[]` for that user
 
 ### Virtual Library Display
-1. User opens "Trakt Recommendations" or "New Seasons" library
-2. Plugin fetches user's Trakt data (cached)
-3. For each item: check if exists in Jellyfin by TMDB ID
-4. Return existing item ID (Play) or virtual item (Download)
-5. Enrich with TMDB metadata (poster, description)
+1. User opens specific library (e.g., "admin's Movies Recommendations")
+2. Plugin resolves .strm files, extracting userId and content type from path
+3. Fetches that user's cached content for that specific content type
+4. For each item: check if exists in Jellyfin by TMDB ID
+5. Return existing item ID (Play) or virtual item (Download)
+6. Enrich with TMDB metadata (poster, description)
 
 ### Download Trigger
 1. User clicks Play on virtual item with `plugin://` path
@@ -393,14 +436,30 @@ Jellyfin.Plugin.JellyNext/
 - Cache serves instant responses when browsing virtual libraries
 - Sync refreshes cache on schedule or manual trigger
 
-### Virtual Library Stub Files
+### Virtual Library Stub Files (Per-User Architecture)
 - **Must use .strm extension**: Jellyfin recognizes .strm as streaming content and skips FFprobe
-- **Filename format critical**: `Title (Year) [tmdbid-ID].strm` format required for proper metadata resolution
-- **Title/Year parsing**: Jellyfin's metadata providers parse title and year from filename before using TMDB ID
-- **Regex extraction**: Resolver uses `\[tmdbid-(\d+)\]$` to extract TMDB ID from filename
-- **Sanitize filenames**: Remove invalid characters from movie titles (replace with underscore)
-- **One-time library setup**: User must manually add `jellynext-virtual` folder as Movies library in Jellyfin once
-- **Resolver specificity**: Only intercepts .strm files containing `jellynext-virtual` in path (avoids interfering with other .strm files)
-- **Provider IDs essential**: Must set both TMDB and IMDB ProviderIds on Movie object for metadata to resolve
+- **Different structures for movies vs shows**:
+  - **Movies**: Flat .strm files in root directory
+    - Format: `Title (Year) [tmdbid-ID].strm`
+    - Example: `Thor (2011) [tmdbid-10195].strm`
+    - Resolved by: `ResolveStubFile()` method
+  - **Shows**: Folder structure (Jellyfin expects TV shows in folders)
+    - Format: `Title (Year) [tvdbid-ID]/tvshow.strm`
+    - Example: `Black Mirror (2011) [tvdbid-253463]/tvshow.strm`
+    - Resolved by: `ResolveShowFolder()` method - detects directories with `[tvdbid-XXX]` pattern
+- **Title/Year parsing**: Jellyfin's metadata providers parse title and year from filename/folder name before using provider IDs
+- **Path structure**: `jellynext-virtual/[userId]/[content-type]/` for per-user isolation
+- **Regex extraction**: Resolver uses patterns:
+  - Path: `@"jellynext-virtual[/\\]([a-f0-9-]+)[/\\]([^/\\]+)[/\\]"` to extract userId and content type
+  - Movie filename: `\[tmdbid-(\d+)\]$` to extract TMDB ID
+  - Show folder name: `\[tvdbid-(\d+)\]$` to extract TVDB ID
+- **Sanitize filenames**: Remove invalid characters from titles (replace with underscore)
+- **Per-user library setup**: Each user needs separate library pointing to their directory (e.g., `jellynext-virtual/[userId]/movies_recommendations` or `jellynext-virtual/[userId]/shows_recommendations`)
+- **Resolver specificity**: Only intercepts paths containing `jellynext-virtual` (avoids interfering with other content)
+- **Provider IDs essential**:
+  - Movies: Must set TMDB and IMDB ProviderIds on Movie object for metadata to resolve
+  - Shows: Must set TVDB (primary), TMDB, and IMDB ProviderIds on Series object for metadata to resolve
+- **User context**: Resolver looks up content in cache using extracted userId - ensures each user sees only their recommendations
+- **Content type mapping**: Directory name (e.g., `movies_recommendations` or `shows_recommendations`) maps to provider name (e.g., `recommendations`) via `VirtualLibraryContentTypeHelper`
 
 ---

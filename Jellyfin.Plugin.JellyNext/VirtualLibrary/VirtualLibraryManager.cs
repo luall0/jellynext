@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Jellyfin.Plugin.JellyNext.Models;
@@ -24,7 +25,9 @@ public class VirtualLibraryManager
     /// </summary>
     /// <param name="cacheService">The content cache service.</param>
     /// <param name="logger">The logger.</param>
-    public VirtualLibraryManager(ContentCacheService cacheService, ILogger<VirtualLibraryManager> logger)
+    public VirtualLibraryManager(
+        ContentCacheService cacheService,
+        ILogger<VirtualLibraryManager> logger)
     {
         _cacheService = cacheService;
         _logger = logger;
@@ -51,17 +54,11 @@ public class VirtualLibraryManager
                 _logger.LogInformation("Created virtual library directory: {Path}", _virtualLibraryPath);
             }
 
-            _logger.LogInformation("================================================================================");
-            _logger.LogInformation("JellyNext Virtual Library Initialized");
-            _logger.LogInformation("================================================================================");
-            _logger.LogInformation("Virtual Library Path: {Path}", _virtualLibraryPath);
-            _logger.LogInformation("To use this library:");
-            _logger.LogInformation("  1. Go to Jellyfin Dashboard → Libraries");
-            _logger.LogInformation("  2. Click 'Add Media Library'");
-            _logger.LogInformation("  3. Select 'Movies' as content type");
-            _logger.LogInformation("  4. Add folder: {Path}", _virtualLibraryPath);
-            _logger.LogInformation("  5. Name it 'Trakt Recommendations'");
-            _logger.LogInformation("================================================================================");
+            // Migrate old structure (clean up old .strm files in root)
+            MigrateOldStructure();
+
+            // Log setup instructions for each user
+            LogSetupInstructions();
 
             // Create stub files for current recommendations
             RefreshStubFiles();
@@ -72,8 +69,99 @@ public class VirtualLibraryManager
         }
     }
 
+    private void MigrateOldStructure()
+    {
+        if (string.IsNullOrEmpty(_virtualLibraryPath))
+        {
+            return;
+        }
+
+        try
+        {
+            // Check for old .strm files in the root of jellynext-virtual
+            var oldStubFiles = Directory.GetFiles(_virtualLibraryPath, $"*{StubFileExtension}", SearchOption.TopDirectoryOnly);
+            if (oldStubFiles.Length > 0)
+            {
+                _logger.LogInformation(
+                    "Found {Count} old stub files in root directory, cleaning up for migration to per-user structure",
+                    oldStubFiles.Length);
+
+                foreach (var file in oldStubFiles)
+                {
+                    File.Delete(file);
+                    _logger.LogDebug("Deleted old stub file: {File}", file);
+                }
+
+                _logger.LogInformation("Migration complete. Old stub files removed. New per-user structure will be created.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during migration from old structure");
+        }
+    }
+
+    private void LogSetupInstructions()
+    {
+        if (string.IsNullOrEmpty(_virtualLibraryPath))
+        {
+            return;
+        }
+
+        var config = Plugin.Instance?.Configuration;
+        if (config?.TraktUsers == null || config.TraktUsers.Length == 0)
+        {
+            _logger.LogInformation("================================================================================");
+            _logger.LogInformation("JellyNext Virtual Libraries Initialized");
+            _logger.LogInformation("================================================================================");
+            _logger.LogInformation("No Trakt users configured yet.");
+            _logger.LogInformation("Link a Trakt account in the plugin settings to get started.");
+            _logger.LogInformation("================================================================================");
+            return;
+        }
+
+        _logger.LogInformation("================================================================================");
+        _logger.LogInformation("JellyNext Virtual Libraries Initialized");
+        _logger.LogInformation("================================================================================");
+        _logger.LogInformation("IMPORTANT: Each content type is a SEPARATE library in Jellyfin");
+        _logger.LogInformation("(e.g., \"admin's Movies Recommendations\", \"admin's Shows Recommendations\")");
+        _logger.LogInformation("================================================================================");
+
+        foreach (var traktUser in config.TraktUsers)
+        {
+            var userId = traktUser.LinkedMbUserId;
+
+            _logger.LogInformation("User ID: {UserId}", userId);
+
+            // Movies Recommendations
+            var moviesRecoPath = GetUserLibraryPath(userId, VirtualLibraryContentType.MoviesRecommendations);
+            _logger.LogInformation("  [1] Movie Recommendations:");
+            _logger.LogInformation("      Path: {Path}", moviesRecoPath);
+            _logger.LogInformation("      Library Type: Movies");
+            _logger.LogInformation("      Suggested Name: \"[Your Username]'s Movies Recommendations\"");
+
+            // Shows Recommendations
+            var showsRecoPath = GetUserLibraryPath(userId, VirtualLibraryContentType.ShowsRecommendations);
+            _logger.LogInformation("  [2] Show Recommendations:");
+            _logger.LogInformation("      Path: {Path}", showsRecoPath);
+            _logger.LogInformation("      Library Type: Shows");
+            _logger.LogInformation("      Suggested Name: \"[Your Username]'s Shows Recommendations\"");
+
+            _logger.LogInformation("  Setup Instructions:");
+            _logger.LogInformation("    1. Go to Jellyfin Dashboard → Libraries → Add Media Library");
+            _logger.LogInformation("    2. For EACH content type above, create a SEPARATE library:");
+            _logger.LogInformation("       - Select content type (Movies or Shows)");
+            _logger.LogInformation("       - Add the folder path shown above");
+            _logger.LogInformation("       - Use the suggested library name");
+            _logger.LogInformation("    3. This allows you to have separate libraries per recommendation type");
+            _logger.LogInformation("--------------------------------------------------------------------------------");
+        }
+
+        _logger.LogInformation("================================================================================");
+    }
+
     /// <summary>
-    /// Refreshes stub files based on current cached recommendations.
+    /// Refreshes stub files based on current cached recommendations for all users.
     /// </summary>
     public void RefreshStubFiles()
     {
@@ -85,7 +173,6 @@ public class VirtualLibraryManager
 
         try
         {
-            // Get admin user (first Trakt user)
             var config = Plugin.Instance?.Configuration;
             if (config?.TraktUsers == null || config.TraktUsers.Length == 0)
             {
@@ -93,57 +180,144 @@ public class VirtualLibraryManager
                 return;
             }
 
-            var adminUser = config.TraktUsers[0];
-            var userId = adminUser.LinkedMbUserId;
-
-            // Get cached movie recommendations
-            var cachedContent = _cacheService.GetCachedContent(userId, "recommendations");
-            var movies = cachedContent.Where(c => c.Type == ContentType.Movie && c.TmdbId.HasValue).ToList();
-
-            _logger.LogInformation("Creating stub files for {Count} movie recommendations", movies.Count);
-
-            // Clean old stub files (remove files that are no longer in recommendations)
-            var existingFiles = Directory.GetFiles(_virtualLibraryPath, $"*{StubFileExtension}");
-            var currentTmdbIds = movies.Select(m => m.TmdbId!.Value).ToHashSet();
-
-            foreach (var file in existingFiles)
+            // Refresh for all users
+            foreach (var traktUser in config.TraktUsers)
             {
-                // Extract TMDB ID from filename (format: "Title (Year) [tmdbid-12345].strm")
-                var fileName = Path.GetFileNameWithoutExtension(file);
-                var tmdbMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"\[tmdbid-(\d+)\]$");
-                if (tmdbMatch.Success && int.TryParse(tmdbMatch.Groups[1].Value, out var tmdbId))
-                {
-                    if (!currentTmdbIds.Contains(tmdbId))
-                    {
-                        File.Delete(file);
-                        _logger.LogDebug("Removed old stub file: {File}", file);
-                    }
-                }
+                var userId = traktUser.LinkedMbUserId;
+                RefreshStubFilesForUser(userId, VirtualLibraryContentType.MoviesRecommendations);
+                RefreshStubFilesForUser(userId, VirtualLibraryContentType.ShowsRecommendations);
+                // Future: Add watchlist content types here
             }
 
-            // Create new stub files with proper naming: "Title (Year) [tmdbid-12345].strm"
-            foreach (var movie in movies)
-            {
-                // Sanitize title for filename
-                var title = SanitizeFilename(movie.Title);
-                var year = movie.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
-                var tmdbId = movie.TmdbId!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                var fileName = $"{title} ({year}) [tmdbid-{tmdbId}]{StubFileExtension}";
-                var stubFile = Path.Combine(_virtualLibraryPath, fileName);
-
-                if (!File.Exists(stubFile))
-                {
-                    // Write TMDB ID as content - this helps if we need to debug
-                    File.WriteAllText(stubFile, $"plugin://jellynext/movie/{movie.TmdbId}");
-                    _logger.LogDebug("Created stub file: {Title} ({Year})", movie.Title, year);
-                }
-            }
-
-            _logger.LogInformation("Stub file refresh complete");
+            _logger.LogInformation("Stub file refresh complete for all users");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error refreshing stub files");
+        }
+    }
+
+    /// <summary>
+    /// Refreshes stub files for a specific user and content type.
+    /// </summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="contentType">The content type.</param>
+    public void RefreshStubFilesForUser(Guid userId, VirtualLibraryContentType contentType)
+    {
+        try
+        {
+            var userPath = GetUserLibraryPath(userId, contentType);
+
+            // Ensure directory exists
+            if (!Directory.Exists(userPath))
+            {
+                Directory.CreateDirectory(userPath);
+                _logger.LogInformation("Created directory: {Path}", userPath);
+            }
+
+            var providerName = VirtualLibraryContentTypeHelper.GetProviderName(contentType);
+            var cachedContent = _cacheService.GetCachedContent(userId, providerName);
+
+            // Determine media type from content type
+            var mediaType = VirtualLibraryContentTypeHelper.GetMediaType(contentType);
+            var isMovies = mediaType == "Movies";
+
+            // Filter content based on media type
+            var items = isMovies
+                ? cachedContent.Where(c => c.Type == ContentType.Movie && c.TmdbId.HasValue).ToList()
+                : cachedContent.Where(c => c.Type == ContentType.Show && c.TvdbId.HasValue).ToList();
+
+            _logger.LogInformation(
+                "Refreshing {Count} {MediaType} recommendations for user {UserId}",
+                items.Count,
+                mediaType.ToLowerInvariant(),
+                userId);
+
+            if (isMovies)
+            {
+                // For movies: flat .strm files in root directory
+                var existingFiles = Directory.GetFiles(userPath, $"*{StubFileExtension}");
+                var currentTmdbIds = items.Select(m => m.TmdbId!.Value).ToHashSet();
+
+                // Clean old stub files
+                foreach (var file in existingFiles)
+                {
+                    var fileName = Path.GetFileNameWithoutExtension(file);
+                    var tmdbMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"\[tmdbid-(\d+)\]$");
+                    if (tmdbMatch.Success && int.TryParse(tmdbMatch.Groups[1].Value, out var tmdbId))
+                    {
+                        if (!currentTmdbIds.Contains(tmdbId))
+                        {
+                            File.Delete(file);
+                            _logger.LogDebug("Removed old stub file: {File}", file);
+                        }
+                    }
+                }
+
+                // Create new stub files
+                foreach (var item in items)
+                {
+                    var title = SanitizeFilename(item.Title);
+                    var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
+                    var tmdbId = item.TmdbId!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    var fileName = $"{title} ({year}) [tmdbid-{tmdbId}]{StubFileExtension}";
+                    var stubFile = Path.Combine(userPath, fileName);
+
+                    if (!File.Exists(stubFile))
+                    {
+                        File.WriteAllText(stubFile, $"plugin://jellynext/movie/{item.TmdbId}");
+                        _logger.LogDebug("Created stub file: {Title} ({Year})", item.Title, year);
+                    }
+                }
+            }
+            else
+            {
+                // For shows: create folder structure (Jellyfin expects shows to be in folders)
+                var existingDirs = Directory.GetDirectories(userPath);
+                var currentTvdbIds = items.Select(s => s.TvdbId!.Value).ToHashSet();
+
+                // Clean old show folders
+                foreach (var dir in existingDirs)
+                {
+                    var dirName = Path.GetFileName(dir);
+                    var tvdbMatch = System.Text.RegularExpressions.Regex.Match(dirName, @"\[tvdbid-(\d+)\]$");
+                    if (tvdbMatch.Success && int.TryParse(tvdbMatch.Groups[1].Value, out var tvdbId))
+                    {
+                        if (!currentTvdbIds.Contains(tvdbId))
+                        {
+                            Directory.Delete(dir, recursive: true);
+                            _logger.LogDebug("Removed old show folder: {Dir}", dir);
+                        }
+                    }
+                }
+
+                // Create new show folders with tvshow.strm
+                foreach (var item in items)
+                {
+                    var title = SanitizeFilename(item.Title);
+                    var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
+                    var tvdbId = item.TvdbId!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    var showFolderName = $"{title} ({year}) [tvdbid-{tvdbId}]";
+                    var showFolder = Path.Combine(userPath, showFolderName);
+
+                    if (!Directory.Exists(showFolder))
+                    {
+                        Directory.CreateDirectory(showFolder);
+                    }
+
+                    // Create tvshow.strm file inside the folder
+                    var stubFile = Path.Combine(showFolder, "tvshow.strm");
+                    if (!File.Exists(stubFile))
+                    {
+                        File.WriteAllText(stubFile, $"plugin://jellynext/show/{item.TvdbId}");
+                        _logger.LogDebug("Created show folder and stub: {Title} ({Year})", item.Title, year);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing stub files for user {UserId}", userId);
         }
     }
 
@@ -154,6 +328,54 @@ public class VirtualLibraryManager
     public string? GetVirtualLibraryPath()
     {
         return _virtualLibraryPath;
+    }
+
+    /// <summary>
+    /// Gets the library path for a specific user and content type.
+    /// </summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="contentType">The content type.</param>
+    /// <returns>The full path to the user's content type directory.</returns>
+    public string GetUserLibraryPath(Guid userId, VirtualLibraryContentType contentType)
+    {
+        if (string.IsNullOrEmpty(_virtualLibraryPath))
+        {
+            throw new InvalidOperationException("Virtual library path not initialized");
+        }
+
+        var directoryName = VirtualLibraryContentTypeHelper.GetDirectoryName(contentType);
+        return Path.Combine(_virtualLibraryPath, userId.ToString(), directoryName);
+    }
+
+    /// <summary>
+    /// Gets setup instructions for all users.
+    /// </summary>
+    /// <returns>Dictionary mapping user IDs to library paths and instructions.</returns>
+    public Dictionary<Guid, Dictionary<VirtualLibraryContentType, string>> GetLibrarySetupInstructions()
+    {
+        var result = new Dictionary<Guid, Dictionary<VirtualLibraryContentType, string>>();
+        var config = Plugin.Instance?.Configuration;
+
+        if (config?.TraktUsers == null || config.TraktUsers.Length == 0)
+        {
+            return result;
+        }
+
+        foreach (var traktUser in config.TraktUsers)
+        {
+            var userId = traktUser.LinkedMbUserId;
+            var userPaths = new Dictionary<VirtualLibraryContentType, string>
+            {
+                [VirtualLibraryContentType.MoviesRecommendations] =
+                    GetUserLibraryPath(userId, VirtualLibraryContentType.MoviesRecommendations),
+                [VirtualLibraryContentType.ShowsRecommendations] =
+                    GetUserLibraryPath(userId, VirtualLibraryContentType.ShowsRecommendations)
+            };
+
+            result[userId] = userPaths;
+        }
+
+        return result;
     }
 
     private static string SanitizeFilename(string filename)
