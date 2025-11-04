@@ -109,10 +109,12 @@ Jellyfin.Plugin.JellyNext/
 ├── Api/
 │   ├── TraktController.cs        # OAuth endpoints
 │   ├── RadarrController.cs       # Radarr test connection endpoint
+│   ├── SonarrController.cs       # Sonarr test connection endpoint
 │   └── JellyNextLibraryController.cs # REST API for virtual library content
 ├── Services/
 │   ├── TraktApi.cs               # Trakt API integration
 │   ├── RadarrService.cs          # Radarr API integration (test, add movies)
+│   ├── SonarrService.cs          # Sonarr API integration (test connection)
 │   ├── TmdbService.cs            # TMDB API key management (custom or Jellyfin's)
 │   ├── ContentCacheService.cs    # In-memory cache for synced content
 │   ├── ContentSyncService.cs     # Orchestrates syncing across providers
@@ -142,6 +144,10 @@ Jellyfin.Plugin.JellyNext/
 │   ├── RadarrRootFolder.cs       # Radarr root folder
 │   ├── RadarrSystemStatus.cs     # Radarr system status
 │   ├── RadarrTestConnectionResponse.cs # Radarr test result
+│   ├── SonarrQualityProfile.cs   # Sonarr quality profile
+│   ├── SonarrRootFolder.cs       # Sonarr root folder
+│   ├── SonarrSystemStatus.cs     # Sonarr system status
+│   ├── SonarrTestConnectionResponse.cs # Sonarr test result
 │   ├── ContentItem.cs            # Unified content representation
 │   └── ContentType.cs            # Movie/Show enum
 ├── Helpers/
@@ -156,9 +162,11 @@ Jellyfin.Plugin.JellyNext/
 - **PluginServiceRegistrator**: Registers all services and content providers in DI container
 - **TraktController**: REST endpoints for OAuth (authorize, deauthorize, status check)
 - **RadarrController**: REST endpoint for testing Radarr connection
+- **SonarrController**: REST endpoint for testing Sonarr connection
 - **JellyNextLibraryController**: REST API for accessing virtual library content (recommendations queries)
 - **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls, recommendations fetching
 - **RadarrService**: Handles Radarr API interactions (test connection, retrieve profiles/folders, add movies)
+- **SonarrService**: Handles Sonarr API interactions (test connection, retrieve profiles/folders)
 - **PlaybackInterceptor**: IHostedService that subscribes to session playback events, detects virtual item playback, triggers downloads
 - **StartupSyncService**: IHostedService that triggers content sync at plugin startup (waits 5 seconds for initialization)
 - **TmdbService**: Manages TMDB API key (uses custom if provided, falls back to Jellyfin's via reflection)
@@ -444,6 +452,55 @@ Jellyfin.Plugin.JellyNext/
 - JavaScript must use `result.Success`, `result.QualityProfiles`, etc. (not camelCase)
 - Root folder dropdown shows available space formatted as human-readable size
 - Connection can be re-tested to change profile/folder without re-entering credentials
+
+### ✅ Sonarr Configuration with Test Connection
+**Architecture:**
+- Admin-configured Sonarr settings stored in `PluginConfiguration`
+- Interactive test connection validates credentials and retrieves available options
+- `SonarrService` handles all Sonarr API interactions
+- `SonarrController` exposes REST endpoint for frontend
+
+**Configuration Properties:**
+- `SonarrUrl` - Base URL (e.g., `http://sonarr:8989`)
+- `SonarrApiKey` - API key from Sonarr settings
+- `SonarrQualityProfileId` - Selected quality profile ID
+- `SonarrRootFolderPath` - Root folder for regular TV shows
+- `SonarrAnimeRootFolderPath` - Optional separate root folder for anime (key difference from Radarr)
+
+**Models:**
+- `SonarrQualityProfile` - Profile info (id, name)
+- `SonarrRootFolder` - Folder info (id, path, freeSpace)
+- `SonarrSystemStatus` - System info (version)
+- `SonarrTestConnectionResponse` - Test result with profiles and folders
+
+**Service Methods:**
+- `SonarrService.TestConnectionAsync(url, apiKey)` - Validates connection and retrieves options
+  - Calls `/api/v3/system/status` - Verifies connection
+  - Calls `/api/v3/qualityprofile` - Gets available profiles
+  - Calls `/api/v3/rootfolder` - Gets available folders
+  - Returns `SonarrTestConnectionResponse` with all data
+
+**API Endpoint:**
+- `GET /JellyNext/Sonarr/TestConnection?sonarrUrl={url}&apiKey={key}` - Test connection
+
+**Configuration UI Flow:**
+1. Admin enters Sonarr URL and API key
+2. Clicks "Test Connection" button
+3. Frontend calls test endpoint with credentials
+4. Backend validates and retrieves profiles/folders
+5. Success: Shows version + populates quality profile, root folder, and anime root folder dropdowns
+6. Failure: Shows error message
+7. Admin selects preferred profile and folders (anime folder optional)
+8. Clicks "Save Configuration" to persist settings
+9. UI pre-selects saved values when testing connection again
+
+**Important Notes:**
+- Uses `NamedClient.Default` HTTP client (same as TraktApi and RadarrService)
+- API returns PascalCase JSON (C# default serialization)
+- JavaScript must use `result.Success`, `result.QualityProfiles`, etc. (not camelCase)
+- Anime root folder is optional - defaults to "Same as regular shows..." if not specified
+- Root folder dropdowns show available space formatted as human-readable size
+- Connection can be re-tested to change profile/folders without re-entering credentials
 
 ### ✅ Playback Interception for Movie Downloads
 **Architecture:**

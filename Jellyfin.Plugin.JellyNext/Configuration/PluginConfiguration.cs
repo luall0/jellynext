@@ -42,6 +42,21 @@ public class PluginConfiguration : BasePluginConfiguration
     public string SonarrApiKey { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the Sonarr Quality Profile ID.
+    /// </summary>
+    public int SonarrQualityProfileId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Sonarr Root Folder Path.
+    /// </summary>
+    public string SonarrRootFolderPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the Sonarr Anime Root Folder Path (optional, for separate anime library).
+    /// </summary>
+    public string SonarrAnimeRootFolderPath { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the cache expiration interval in hours.
     /// </summary>
     public int CacheExpirationHours { get; set; } = 6;

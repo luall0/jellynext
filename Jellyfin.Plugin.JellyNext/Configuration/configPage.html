@@ -125,6 +125,41 @@
                             <label class="inputLabel inputLabelUnfocused" for="SonarrApiKey">Sonarr API Key:</label>
                             <input is="emby-input" type="text" id="SonarrApiKey" name="SonarrApiKey" />
                         </div>
+                        <div style="margin-top: 1em;">
+                            <button is="emby-button" type="button" id="TestSonarrBtn" class="raised button-submit">
+                                <span>Test Connection</span>
+                            </button>
+                        </div>
+                        <div id="SonarrConnectionStatus" style="margin-top: 1em; display: none;"></div>
+                        <div id="SonarrOptionsSection" style="display: none;">
+                            <div class="inputContainer" style="margin-top: 1em;">
+                                <label class="inputLabel inputLabelUnfocused" for="SonarrQualityProfile">Quality Profile:</label>
+                                <select is="emby-select" id="SonarrQualityProfile" name="SonarrQualityProfile">
+                                    <option value="">Select a quality profile...</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    Quality profile to use when downloading TV shows
+                                </div>
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="SonarrRootFolder">Root Folder:</label>
+                                <select is="emby-select" id="SonarrRootFolder" name="SonarrRootFolder">
+                                    <option value="">Select a root folder...</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    Folder where downloaded TV shows will be stored
+                                </div>
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="SonarrAnimeRootFolder">Anime Root Folder (Optional):</label>
+                                <select is="emby-select" id="SonarrAnimeRootFolder" name="SonarrAnimeRootFolder">
+                                    <option value="">Same as regular shows...</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    Optional separate folder for anime shows. If not specified, uses the regular root folder.
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Recommendations Settings -->
@@ -179,7 +214,9 @@
                 currentUserGuid: null,
                 authCheckInterval: null,
                 radarrProfiles: [],
-                radarrFolders: []
+                radarrFolders: [],
+                sonarrProfiles: [],
+                sonarrFolders: []
             };
 
             // Load users into dropdown
@@ -419,6 +456,98 @@
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
             }
 
+            // Test Sonarr connection
+            document.getElementById('TestSonarrBtn').addEventListener('click', function () {
+                var sonarrUrl = document.getElementById('SonarrUrl').value;
+                var sonarrApiKey = document.getElementById('SonarrApiKey').value;
+
+                if (!sonarrUrl || !sonarrApiKey) {
+                    Dashboard.alert('Please enter Sonarr URL and API Key first');
+                    return;
+                }
+
+                Dashboard.showLoadingMsg();
+                var statusDiv = document.getElementById('SonarrConnectionStatus');
+                var optionsSection = document.getElementById('SonarrOptionsSection');
+                statusDiv.style.display = 'none';
+                optionsSection.style.display = 'none';
+
+                var encodedUrl = encodeURIComponent(sonarrUrl);
+                var encodedApiKey = encodeURIComponent(sonarrApiKey);
+
+                ApiClient.fetch({
+                    type: 'GET',
+                    url: ApiClient.getUrl('JellyNext/Sonarr/TestConnection?sonarrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (result) {
+                    Dashboard.hideLoadingMsg();
+                    statusDiv.style.display = 'block';
+
+                    if (result.Success) {
+                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #52B54B;">✓ Successfully connected to Sonarr v' + result.Version + '</div>';
+
+                        JellyNextConfig.sonarrProfiles = result.QualityProfiles || [];
+                        JellyNextConfig.sonarrFolders = result.RootFolders || [];
+
+                        populateSonarrOptions();
+                        optionsSection.style.display = 'block';
+                    } else {
+                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + (result.ErrorMessage || 'Unknown error') + '</div>';
+                        optionsSection.style.display = 'none';
+                    }
+                }).catch(function (error) {
+                    Dashboard.hideLoadingMsg();
+                    statusDiv.style.display = 'block';
+                    statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + error.message + '</div>';
+                    optionsSection.style.display = 'none';
+                });
+            });
+
+            // Populate Sonarr quality profiles and root folders
+            function populateSonarrOptions() {
+                var profileSelect = document.getElementById('SonarrQualityProfile');
+                var folderSelect = document.getElementById('SonarrRootFolder');
+                var animeFolderSelect = document.getElementById('SonarrAnimeRootFolder');
+
+                profileSelect.innerHTML = '<option value="">Select a quality profile...</option>';
+                JellyNextConfig.sonarrProfiles.forEach(function (profile) {
+                    var option = document.createElement('option');
+                    option.value = profile.id;
+                    option.textContent = profile.name;
+                    profileSelect.appendChild(option);
+                });
+
+                folderSelect.innerHTML = '<option value="">Select a root folder...</option>';
+                JellyNextConfig.sonarrFolders.forEach(function (folder) {
+                    var option = document.createElement('option');
+                    option.value = folder.path;
+                    option.textContent = folder.path + ' (' + formatBytes(folder.freeSpace) + ' free)';
+                    folderSelect.appendChild(option);
+                });
+
+                animeFolderSelect.innerHTML = '<option value="">Same as regular shows...</option>';
+                JellyNextConfig.sonarrFolders.forEach(function (folder) {
+                    var option = document.createElement('option');
+                    option.value = folder.path;
+                    option.textContent = folder.path + ' (' + formatBytes(folder.freeSpace) + ' free)';
+                    animeFolderSelect.appendChild(option);
+                });
+
+                // Try to restore previously selected values
+                ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
+                    if (config.SonarrQualityProfileId) {
+                        profileSelect.value = config.SonarrQualityProfileId;
+                    }
+                    if (config.SonarrRootFolderPath) {
+                        folderSelect.value = config.SonarrRootFolderPath;
+                    }
+                    if (config.SonarrAnimeRootFolderPath) {
+                        animeFolderSelect.value = config.SonarrAnimeRootFolderPath;
+                    }
+                });
+            }
+
             // Load configuration on page show
             document.getElementById('JellyNextConfigPage').addEventListener('pageshow', function () {
                 Dashboard.showLoadingMsg();
@@ -443,6 +572,15 @@
                             var statusDiv = document.getElementById('RadarrConnectionStatus');
                             statusDiv.style.display = 'block';
                             statusDiv.innerHTML = '<div class="fieldDescription" style="color: #0088cc;">ℹ Radarr is configured. Click "Test Connection" to modify quality profile or root folder.</div>';
+                        }
+                    }
+
+                    // If Sonarr is configured, show a hint to test connection to see options
+                    if (config.SonarrUrl && config.SonarrApiKey) {
+                        if (config.SonarrQualityProfileId && config.SonarrRootFolderPath) {
+                            var sonarrStatusDiv = document.getElementById('SonarrConnectionStatus');
+                            sonarrStatusDiv.style.display = 'block';
+                            sonarrStatusDiv.innerHTML = '<div class="fieldDescription" style="color: #0088cc;">ℹ Sonarr is configured. Click "Test Connection" to modify quality profile or root folder.</div>';
                         }
                     }
 
@@ -472,6 +610,21 @@
 
                     config.SonarrUrl = document.getElementById('SonarrUrl').value;
                     config.SonarrApiKey = document.getElementById('SonarrApiKey').value;
+
+                    // Save Sonarr quality profile and root folders if selected
+                    var sonarrQualityProfileId = document.getElementById('SonarrQualityProfile').value;
+                    var sonarrRootFolderPath = document.getElementById('SonarrRootFolder').value;
+                    var sonarrAnimeRootFolderPath = document.getElementById('SonarrAnimeRootFolder').value;
+                    if (sonarrQualityProfileId) {
+                        config.SonarrQualityProfileId = parseInt(sonarrQualityProfileId);
+                    }
+                    if (sonarrRootFolderPath) {
+                        config.SonarrRootFolderPath = sonarrRootFolderPath;
+                    }
+                    if (sonarrAnimeRootFolderPath) {
+                        config.SonarrAnimeRootFolderPath = sonarrAnimeRootFolderPath;
+                    }
+
                     config.IgnoreCollected = document.getElementById('IgnoreCollected').checked;
                     config.IgnoreWatchlisted = document.getElementById('IgnoreWatchlisted').checked;
                     config.CacheExpirationHours = parseInt(document.getElementById('CacheExpirationHours').value);
