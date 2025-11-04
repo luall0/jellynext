@@ -2,9 +2,11 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.JellyNext.Models;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
+using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +22,8 @@ public class PlaybackInterceptor : IHostedService
     private readonly RadarrService _radarrService;
     private readonly SonarrService _sonarrService;
     private readonly ContentCacheService _cacheService;
+    private readonly IUserDataManager _userDataManager;
+    private readonly IUserManager _userManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PlaybackInterceptor"/> class.
@@ -29,24 +33,31 @@ public class PlaybackInterceptor : IHostedService
     /// <param name="radarrService">The Radarr service.</param>
     /// <param name="sonarrService">The Sonarr service.</param>
     /// <param name="cacheService">The content cache service.</param>
+    /// <param name="userDataManager">The user data manager.</param>
+    /// <param name="userManager">The user manager.</param>
     public PlaybackInterceptor(
         ILogger<PlaybackInterceptor> logger,
         ISessionManager sessionManager,
         RadarrService radarrService,
         SonarrService sonarrService,
-        ContentCacheService cacheService)
+        ContentCacheService cacheService,
+        IUserDataManager userDataManager,
+        IUserManager userManager)
     {
         _logger = logger;
         _sessionManager = sessionManager;
         _radarrService = radarrService;
         _sonarrService = sonarrService;
         _cacheService = cacheService;
+        _userDataManager = userDataManager;
+        _userManager = userManager;
     }
 
     /// <inheritdoc/>
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _sessionManager.PlaybackStart += OnPlaybackStart;
+        _sessionManager.PlaybackStopped += OnPlaybackStopped;
         _logger.LogInformation("PlaybackInterceptor started - monitoring for virtual item playback");
         return Task.CompletedTask;
     }
@@ -55,6 +66,7 @@ public class PlaybackInterceptor : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _sessionManager.PlaybackStart -= OnPlaybackStart;
+        _sessionManager.PlaybackStopped -= OnPlaybackStopped;
         _logger.LogInformation("PlaybackInterceptor stopped");
         return Task.CompletedTask;
     }
@@ -312,6 +324,61 @@ public class PlaybackInterceptor : IHostedService
         catch (Exception msgEx)
         {
             _logger.LogWarning(msgEx, "Could not send message to session");
+        }
+    }
+
+    private async void OnPlaybackStopped(object? sender, PlaybackProgressEventArgs e)
+    {
+        try
+        {
+            if (e.Item == null || string.IsNullOrEmpty(e.Item.Path) || e.Session == null)
+            {
+                return;
+            }
+
+            // Check if this is a JellyNext virtual item
+            if (!e.Item.Path.Contains("jellynext-virtual", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // Clear playback state completely to prevent "Next Up" appearance
+            var user = _userManager.GetUserById(e.Session.UserId);
+            if (user != null)
+            {
+                // Clear state for the episode
+                var userData = _userDataManager.GetUserData(user, e.Item);
+                userData.PlaybackPositionTicks = 0;
+                userData.Played = false;
+                userData.LastPlayedDate = null;
+                _userDataManager.SaveUserData(
+                    user,
+                    e.Item,
+                    userData,
+                    UserDataSaveReason.UpdateUserData,
+                    CancellationToken.None);
+
+                // Also clear state for the parent series (if it exists)
+                // This prevents the series from appearing in "Next Up"
+                var parent = e.Item.GetParent();
+                if (parent != null)
+                {
+                    var parentData = _userDataManager.GetUserData(user, parent);
+                    parentData.PlaybackPositionTicks = 0;
+                    parentData.Played = false;
+                    parentData.LastPlayedDate = null;
+                    _userDataManager.SaveUserData(
+                        user,
+                        parent,
+                        parentData,
+                        UserDataSaveReason.UpdateUserData,
+                        CancellationToken.None);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error clearing playback state after playback stopped");
         }
     }
 }

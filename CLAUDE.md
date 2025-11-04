@@ -90,8 +90,8 @@ JellyNext is a Jellyfin plugin that integrates Trakt-powered discovery directly 
 
 ## Tech Stack
 
-- **Platform**: C# / .NET 8.0
-- **Framework**: Jellyfin Plugin SDK 10.9+
+- **Platform**: C# / .NET 9.0
+- **Framework**: Jellyfin Plugin SDK 10.11+
 - **External APIs**:
   - Trakt API (OAuth2 for per-user auth)
   - TMDB API (metadata & images)
@@ -624,6 +624,15 @@ Jellyfin.Plugin.JellyNext/
 - User can download multiple seasons by clicking respective fake episodes
 - Future episodes of monitored season will auto-download if aired
 
+**Preventing "Next Up" Appearance:**
+- `PlaybackInterceptor` subscribes to both `PlaybackStart` and `PlaybackStopped` events
+- On `PlaybackStart`: Stops playback immediately and triggers download
+- On `PlaybackStopped`: Clears playback state to prevent virtual items from appearing in "Next Up"
+  - Clears episode state: `PlaybackPositionTicks = 0`, `Played = false`, `LastPlayedDate = null`
+  - Also clears parent series state using `GetParent()` - critical for TV shows
+  - Must happen in `PlaybackStopped` (not `PlaybackStart`) because Jellyfin saves position after stop event
+- User requires `IUserDataManager` and `IUserManager` (Jellyfin 10.11 API uses `User` objects, not `Guid`)
+
 ## Core Workflows
 
 ### Initial Setup (Admin)
@@ -684,6 +693,17 @@ Jellyfin.Plugin.JellyNext/
 - Use `Plugin.Instance?.Configuration` not `Plugin.Instance?.PluginConfiguration`
 - `BasePlugin<T>` exposes config as `Configuration` property
 - `UserHelper.GetTraktUser(userGuid)` is the standard way to lookup per-user tokens
+
+### Jellyfin 10.11 API Changes
+- **User Data Manager**: `IUserDataManager.GetUserData()` and `SaveUserData()` now require `User` entity objects instead of `Guid`
+  - Must inject `IUserManager` to get `User` objects via `GetUserById(Guid)`
+  - User entity is from `Jellyfin.Database.Implementations.Entities` namespace
+  - Example: `var user = _userManager.GetUserById(userId); var userData = _userDataManager.GetUserData(user, item);`
+- **Task Triggers**: `TaskTriggerInfo.Type` changed from string constants to `TaskTriggerInfoType` enum
+  - Old: `Type = TaskTriggerInfo.TriggerInterval` (does not exist)
+  - New: `Type = TaskTriggerInfoType.IntervalTrigger`
+  - Enum values: `DailyTrigger`, `WeeklyTrigger`, `IntervalTrigger`, `StartupTrigger`
+- **Framework**: Requires .NET 9.0 (Jellyfin 10.11 SDK is not compatible with .NET 8.0)
 
 ### TMDB API Key Access
 - **TmdbService** handles TMDB API key with intelligent fallback
