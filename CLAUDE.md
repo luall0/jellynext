@@ -148,6 +148,9 @@ Jellyfin.Plugin.JellyNext/
 │   ├── SonarrRootFolder.cs       # Sonarr root folder
 │   ├── SonarrSystemStatus.cs     # Sonarr system status
 │   ├── SonarrTestConnectionResponse.cs # Sonarr test result
+│   ├── SonarrSeries.cs           # Sonarr series (add/retrieve)
+│   ├── SonarrSeason.cs           # Sonarr season with monitoring
+│   ├── SonarrAddOptions.cs       # Sonarr add options
 │   ├── ContentItem.cs            # Unified content representation
 │   └── ContentType.cs            # Movie/Show enum
 ├── Helpers/
@@ -166,8 +169,8 @@ Jellyfin.Plugin.JellyNext/
 - **JellyNextLibraryController**: REST API for accessing virtual library content (recommendations queries)
 - **TraktApi**: Handles OAuth device flow, token refresh, authenticated API calls, recommendations fetching
 - **RadarrService**: Handles Radarr API interactions (test connection, retrieve profiles/folders, add movies)
-- **SonarrService**: Handles Sonarr API interactions (test connection, retrieve profiles/folders)
-- **PlaybackInterceptor**: IHostedService that subscribes to session playback events, detects virtual item playback, triggers downloads
+- **SonarrService**: Handles Sonarr API interactions (test connection, retrieve profiles/folders, add series with season-specific monitoring, anime support)
+- **PlaybackInterceptor**: IHostedService that subscribes to session playback events, detects virtual item playback, triggers downloads for movies (Radarr) and TV shows (Sonarr)
 - **StartupSyncService**: IHostedService that triggers content sync at plugin startup (waits 5 seconds for initialization)
 - **TmdbService**: Manages TMDB API key (uses custom if provided, falls back to Jellyfin's via reflection)
 - **ContentCacheService**: In-memory per-user, per-provider cache with automatic expiration
@@ -562,7 +565,64 @@ Jellyfin.Plugin.JellyNext/
 - Playback stops immediately when virtual item detected (no buffering or error screens)
 - User receives immediate feedback via on-screen notification
 - Download happens in background - also visible in Radarr activity
-- Only works for movies currently - TV shows support planned separately
+
+### ✅ Playback Interception for TV Show Downloads
+**Architecture:**
+- `PlaybackInterceptor` now handles both movies and TV shows
+- Detects content type by path pattern (`movies_` vs `shows_`)
+- `SonarrService` injected alongside `RadarrService`
+
+**Per-Season Download Strategy:**
+- Virtual library creates fake episodes for seasons 1-10 in each show folder
+- Format: `S##E01 - Download Season #.strm` (e.g., `S01E01 - Download Season 1.strm`)
+- Jellyfin treats these as episodes, displays them in season view
+- User clicks specific season episode to download that season only
+
+**How It Works:**
+1. Service detects playback attempt on show episode in virtual library
+2. Extracts season number from filename using regex: `S(\d+)E\d+`
+3. Extracts TVDB ID from parent folder name: `\[tvdbid-(\d+)\]$`
+4. Looks up show details from `ContentCacheService`
+5. Detects if anime using title heuristics
+6. Calls `SonarrService.AddSeriesAsync(tvdbId, title, year, seasonNumber, isAnime)`
+7. Stops playback immediately and sends notification
+
+**Sonarr Integration:**
+- `SonarrService.AddSeriesAsync(tvdbId, title, year, seasonNumber, isAnime)` - Adds series with season monitoring
+  - Uses configured `SonarrUrl`, `SonarrApiKey`, `SonarrQualityProfileId`
+  - **Root folder selection**: Uses `SonarrAnimeRootFolderPath` if `isAnime=true`, else `SonarrRootFolderPath`
+  - **Series monitored**: `Monitored = true` (required for Sonarr to function)
+  - **Season-specific monitoring**: Only requested season has `Monitored = true` in seasons array
+  - **Prevents mass downloads**: Other seasons remain unmonitored
+  - **Smart updates**: If series exists, monitors new season and triggers search
+  - **Immediate search**: `SearchForMissingEpisodes = true` triggers download
+  - Returns `SonarrSeries` on success, `null` on failure
+
+**Models:**
+- `SonarrSeries` - Represents series in Sonarr (id, title, tvdbId, qualityProfileId, rootFolderPath, monitored, seasons, seriesType)
+- `SonarrSeason` - Season info (seasonNumber, monitored)
+- `SonarrAddOptions` - Add options (searchForMissingEpisodes)
+
+**Anime Detection:**
+- Simple heuristic checks title for keywords: anime, shippuden, my hero academia, attack on titan, dragon ball, one piece, naruto, bleach, demon slayer, death note
+- Can be enhanced later with Trakt genres, TVDB tags, or user configuration
+- Determines which root folder to use (anime vs regular)
+
+**User Notifications:**
+- Success: "{Title} ({Year}) - Season {Season} has been added to your download queue and will appear in your library shortly."
+- Failure: "Failed to add {Title} ({Year}) - Season {Season} to download queue. Please check your Sonarr configuration."
+- 5-second timeout notification
+
+**Cross-Client Support:**
+- Works on all Jellyfin clients (Web, Android, iOS, TV, Kodi)
+- No client modifications required
+- User experience: Click Play on season episode → Playback stops → Notification → Season downloading
+
+**Important Notes:**
+- Series is monitored but only specific seasons are monitored at season level
+- Prevents automatic downloads of unwanted seasons
+- User can download multiple seasons by clicking respective fake episodes
+- Future episodes of monitored season will auto-download if aired
 
 ## Core Workflows
 
@@ -589,8 +649,8 @@ Jellyfin.Plugin.JellyNext/
 5. Return existing item ID (Play) or virtual item (Download)
 6. Enrich with TMDB metadata (poster, description)
 
-### Download Trigger
-1. User clicks Play on virtual item (recommendation not yet in library)
+### Download Trigger (Movies)
+1. User clicks Play on virtual movie (recommendation not yet in library)
 2. PlaybackInterceptor detects virtual item path during PlaybackStart event
 3. Extracts TMDB ID from .strm filename and user ID from path
 4. Looks up movie details in ContentCacheService
@@ -598,6 +658,18 @@ Jellyfin.Plugin.JellyNext/
 6. Stops playback immediately via SendPlaystateCommand(Stop)
 7. Displays on-screen notification to user (5 second timeout)
 8. Download proceeds in background, visible in Radarr activity
+
+### Download Trigger (TV Shows)
+1. User clicks Play on virtual show episode (e.g., "S01E01 - Download Season 1")
+2. PlaybackInterceptor detects virtual item path during PlaybackStart event
+3. Extracts season number from filename (S##E## pattern) and user ID from path
+4. Extracts TVDB ID from parent folder name
+5. Looks up show details in ContentCacheService
+6. Detects if anime using title heuristics
+7. Calls Sonarr API to add series with specific season monitored
+8. Stops playback immediately via SendPlaystateCommand(Stop)
+9. Displays on-screen notification to user (5 second timeout)
+10. Download proceeds in background, visible in Sonarr activity
 
 ## Important Gotchas
 
@@ -648,10 +720,13 @@ Jellyfin.Plugin.JellyNext/
     - Format: `Title (Year) [tmdbid-ID].strm`
     - Example: `Thor (2011) [tmdbid-10195].strm`
     - Resolved by: `ResolveStubFile()` method
-  - **Shows**: Folder structure (Jellyfin expects TV shows in folders)
-    - Format: `Title (Year) [tvdbid-ID]/tvshow.strm`
-    - Example: `Black Mirror (2011) [tvdbid-253463]/tvshow.strm`
+  - **Shows**: Folder structure with per-season fake episodes
+    - Format: `Title (Year) [tvdbid-ID]/S##E01 - Download Season #.strm`
+    - Example: `Black Mirror (2011) [tvdbid-253463]/S01E01 - Download Season 1.strm`
+    - Creates seasons 1-10 by default (users can trigger higher seasons manually)
+    - Jellyfin treats these as episodes, displays in season view
     - Resolved by: `ResolveShowFolder()` method - detects directories with `[tvdbid-XXX]` pattern
+    - PlaybackInterceptor extracts season from `S##E##` pattern in filename
 - **Title/Year parsing**: Jellyfin's metadata providers parse title and year from filename/folder name before using provider IDs
 - **Path structure**: `jellynext-virtual/[userId]/[content-type]/` for per-user isolation
 - **Regex extraction**: Resolver uses patterns:

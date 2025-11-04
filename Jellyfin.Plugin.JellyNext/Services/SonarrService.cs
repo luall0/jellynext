@@ -91,6 +91,144 @@ public class SonarrService
     }
 
     /// <summary>
+    /// Adds a series to Sonarr with specific season monitoring.
+    /// </summary>
+    /// <param name="tvdbId">The TVDB ID of the series.</param>
+    /// <param name="title">The series title.</param>
+    /// <param name="year">The series year.</param>
+    /// <param name="seasonNumber">The season number to monitor (downloads only this season).</param>
+    /// <param name="isAnime">Whether the series is anime (uses anime root folder).</param>
+    /// <returns>The added series if successful, null otherwise.</returns>
+    public async Task<SonarrSeries?> AddSeriesAsync(int tvdbId, string title, int? year, int seasonNumber, bool isAnime = false)
+    {
+        try
+        {
+            var config = Plugin.Instance?.Configuration;
+            if (config == null)
+            {
+                _logger.LogError("Plugin configuration not available");
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(config.SonarrUrl) || string.IsNullOrWhiteSpace(config.SonarrApiKey))
+            {
+                _logger.LogError("Sonarr URL or API key not configured");
+                return null;
+            }
+
+            using var httpClient = CreateSonarrClient(config.SonarrUrl, config.SonarrApiKey);
+
+            // Check if series already exists
+            var existingSeries = await httpClient.GetFromJsonAsync<List<SonarrSeries>>($"/api/v3/series?tvdbId={tvdbId}");
+            if (existingSeries != null && existingSeries.Count > 0)
+            {
+                var existing = existingSeries[0];
+                _logger.LogInformation("Series {Title} already exists in Sonarr with ID {SeriesId}", title, existing.Id);
+
+                // Check if the requested season is already monitored
+                var existingSeason = existing.Seasons?.Find(s => s.SeasonNumber == seasonNumber);
+                if (existingSeason != null && existingSeason.Monitored)
+                {
+                    _logger.LogInformation("Season {SeasonNumber} of {Title} is already monitored", seasonNumber, title);
+                    return existing;
+                }
+
+                // Update the series to monitor the requested season
+                existingSeason = existing.Seasons?.Find(s => s.SeasonNumber == seasonNumber);
+                if (existingSeason != null)
+                {
+                    existingSeason.Monitored = true;
+                    var updateResponse = await httpClient.PutAsJsonAsync($"/api/v3/series/{existing.Id}", existing);
+                    if (updateResponse.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Updated {Title} to monitor season {SeasonNumber}", title, seasonNumber);
+
+                        // Trigger search for the newly monitored season
+                        var commandBody = new
+                        {
+                            name = "SeriesSearch",
+                            seriesId = existing.Id
+                        };
+                        await httpClient.PostAsJsonAsync("/api/v3/command", commandBody);
+
+                        return existing;
+                    }
+                    else
+                    {
+                        _logger.LogError("Failed to update series monitoring for {Title}", title);
+                    }
+                }
+
+                return existing;
+            }
+
+            // Determine root folder based on anime flag
+            var rootFolderPath = isAnime && !string.IsNullOrWhiteSpace(config.SonarrAnimeRootFolderPath)
+                ? config.SonarrAnimeRootFolderPath
+                : config.SonarrRootFolderPath;
+
+            if (string.IsNullOrWhiteSpace(rootFolderPath))
+            {
+                _logger.LogError("Sonarr root folder path not configured");
+                return null;
+            }
+
+            // Create season monitoring list (only monitor the requested season)
+            var seasons = new List<SonarrSeason>();
+            for (int i = 0; i <= 20; i++) // Sonarr needs all seasons defined
+            {
+                seasons.Add(new SonarrSeason
+                {
+                    SeasonNumber = i,
+                    Monitored = i == seasonNumber // Only monitor the requested season
+                });
+            }
+
+            // Create series object
+            var newSeries = new SonarrSeries
+            {
+                TvdbId = tvdbId,
+                Title = title,
+                QualityProfileId = config.SonarrQualityProfileId,
+                RootFolderPath = rootFolderPath,
+                Monitored = true, // Series monitored, but only specific season is monitored at season level
+                SeasonFolder = true,
+                SeriesType = isAnime ? "anime" : "standard",
+                Seasons = seasons,
+                AddOptions = new SonarrAddOptions
+                {
+                    SearchForMissingEpisodes = true // Trigger immediate search
+                }
+            };
+
+            // Add series to Sonarr
+            var response = await httpClient.PostAsJsonAsync("/api/v3/series", newSeries);
+            if (response.IsSuccessStatusCode)
+            {
+                var addedSeries = await response.Content.ReadFromJsonAsync<SonarrSeries>();
+                _logger.LogInformation(
+                    "Successfully added {Title} ({Year}) to Sonarr - Season {SeasonNumber} monitored - Type: {SeriesType}",
+                    title,
+                    year,
+                    seasonNumber,
+                    isAnime ? "Anime" : "Standard");
+                return addedSeries;
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to add series {Title} to Sonarr: {StatusCode} - {Error}", title, response.StatusCode, errorContent);
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding series {Title} to Sonarr", title);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Creates an HTTP client configured for Sonarr API.
     /// </summary>
     /// <param name="sonarrUrl">The Sonarr URL.</param>

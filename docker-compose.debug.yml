@@ -17,29 +17,20 @@ services:
       - ./Jellyfin.Plugin.JellyNext/bin/Debug/net8.0/Jellyfin.Plugin.JellyNext.dll:/config/plugins/JellyNext_1.0.0.0/Jellyfin.Plugin.JellyNext.dll:ro
       - ./Jellyfin.Plugin.JellyNext/bin/Debug/net8.0/Jellyfin.Plugin.JellyNext.pdb:/config/plugins/JellyNext_1.0.0.0/Jellyfin.Plugin.JellyNext.pdb:ro
       # Jellyfin data persistence (optional, comment out for clean start each time)
-      - jellyfin-config:/config
+      - ./jellyfin-config:/config
       - jellyfin-cache:/cache
+    networks:
+      - media_network
     ports:
-      - "8096:8096"   # HTTP Web UI
-      - "8920:8920"   # HTTPS Web UI (optional)
+      - "8097:8096"   # HTTP Web UI
       - "4024:4024"   # Remote debugger port
     restart: unless-stopped
 
-  radarr:
-    image: lscr.io/linuxserver/radarr:latest
-    container_name: radarr-jellynext-debug
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=Etc/UTC
-    volumes:
-      - ./docker-data/radarr/config:/config
-      - ./docker-data/radarr/downloads:/downloads
-      - ./docker-data/radarr/movies:/movies
-    ports:
-      - "7878:7878"
-    restart: unless-stopped
+networks:
+  media_network:
+    external: true
+    name: media_server_media_network
 
 volumes:
-  jellyfin-config:
   jellyfin-cache:
+

@@ -345,7 +345,7 @@ public class VirtualLibraryManager
             }
             else
             {
-                // For shows: create folder structure (Jellyfin expects shows to be in folders)
+                // For shows: create folder structure with per-season .strm files
                 var existingDirs = Directory.GetDirectories(userPath);
                 var currentTvdbIds = items.Select(s => s.TvdbId!.Value).ToHashSet();
 
@@ -364,7 +364,7 @@ public class VirtualLibraryManager
                     }
                 }
 
-                // Create new show folders with tvshow.strm
+                // Create new show folders with per-season .strm files
                 foreach (var item in items)
                 {
                     var title = SanitizeFilename(item.Title);
@@ -378,18 +378,26 @@ public class VirtualLibraryManager
                         Directory.CreateDirectory(showFolder);
                     }
 
-                    // Create tvshow.strm file inside the folder
-                    var stubFile = Path.Combine(showFolder, "tvshow.strm");
-                    if (!File.Exists(stubFile))
+                    // Create per-season .strm files as fake episodes (seasons 1-10)
+                    // Format: S01E01 - Download Season 1.strm (Jellyfin treats these as episodes)
+                    // Users can trigger downloads for higher seasons manually
+                    for (int seasonNumber = 1; seasonNumber <= 10; seasonNumber++)
                     {
-                        // Point to dummy video file for FFprobe compatibility
-                        // Playback interceptor detects virtual items by path, not file content
-                        var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
-                            ? _dummyVideoPath
-                            : "http://jellynext-placeholder/show"; // Fallback if dummy video creation failed
-                        File.WriteAllText(stubFile, content);
-                        _logger.LogDebug("Created show folder and stub: {Title} ({Year})", item.Title, year);
+                        var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
+                        var stubFile = Path.Combine(showFolder, seasonFileName);
+
+                        if (!File.Exists(stubFile))
+                        {
+                            // Point to dummy video file for FFprobe compatibility
+                            // Playback interceptor will extract season number from filename pattern S##E##
+                            var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
+                                ? _dummyVideoPath
+                                : "http://jellynext-placeholder/show"; // Fallback if dummy video creation failed
+                            File.WriteAllText(stubFile, content);
+                        }
                     }
+
+                    _logger.LogDebug("Created show folder with per-season stubs: {Title} ({Year})", item.Title, year);
                 }
             }
         }
