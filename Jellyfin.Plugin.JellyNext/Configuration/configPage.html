@@ -63,18 +63,6 @@
                         </div>
                     </div>
 
-                    <!-- TMDB Settings -->
-                    <div class="verticalSection">
-                        <h3 class="sectionTitle">TMDB Settings (Optional)</h3>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="TmdbApiKey">TMDB API Key:</label>
-                            <input is="emby-input" type="text" id="TmdbApiKey" name="TmdbApiKey" placeholder="Optional - uses Jellyfin's key if empty" />
-                            <div class="fieldDescription">
-                                Optional: Provide your own TMDB API key (free at themoviedb.org) for dedicated rate limits and to avoid metadata issues during high traffic.
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Radarr Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Radarr Settings</h3>
@@ -557,7 +545,6 @@
 
                 // Load plugin configuration
                 ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
-                    document.getElementById('TmdbApiKey').value = config.TmdbApiKey || '';
                     document.getElementById('RadarrUrl').value = config.RadarrUrl || '';
                     document.getElementById('RadarrApiKey').value = config.RadarrApiKey || '';
                     document.getElementById('SonarrUrl').value = config.SonarrUrl || '';
@@ -594,7 +581,6 @@
                 Dashboard.showLoadingMsg();
 
                 ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
-                    config.TmdbApiKey = document.getElementById('TmdbApiKey').value;
                     config.RadarrUrl = document.getElementById('RadarrUrl').value;
                     config.RadarrApiKey = document.getElementById('RadarrApiKey').value;
 

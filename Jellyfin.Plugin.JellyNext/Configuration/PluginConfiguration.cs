@@ -62,11 +62,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public int CacheExpirationHours { get; set; } = 6;
 
     /// <summary>
-    /// Gets or sets the TMDB API Key (optional - uses Jellyfin's key if not provided).
-    /// </summary>
-    public string TmdbApiKey { get; set; } = string.Empty;
-
-    /// <summary>
     /// Gets or sets a value indicating whether to ignore collected items in recommendations.
     /// </summary>
     public bool IgnoreCollected { get; set; } = true;

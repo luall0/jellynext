@@ -19,7 +19,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         // Core services
         serviceCollection.AddHttpClient();
         serviceCollection.AddSingleton<TraktApi>();
-        serviceCollection.AddSingleton<TmdbService>();
         serviceCollection.AddSingleton<ContentCacheService>();
         serviceCollection.AddSingleton<RadarrService>();
         serviceCollection.AddSingleton<SonarrService>();

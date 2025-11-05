@@ -375,7 +375,6 @@ public class TraktApi
         }
 
         var responseContent = await response.Content.ReadAsStringAsync();
-        _logger.LogInformation("Trakt API response for show {TraktId} seasons (first 1000 chars): {Response}", traktId, responseContent.Length > 1000 ? responseContent.Substring(0, 1000) + "..." : responseContent);
 
         TraktSeason[]? seasons = null;
         try
