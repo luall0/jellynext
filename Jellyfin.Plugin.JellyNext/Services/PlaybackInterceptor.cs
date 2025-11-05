@@ -152,9 +152,18 @@ public class PlaybackInterceptor : IHostedService
             return;
         }
 
-        // Get movie details from cache
-        var cachedContent = _cacheService.GetCachedContent(itemUserId, "recommendations");
-        var contentItem = cachedContent.FirstOrDefault(c => c.Type == ContentType.Movie && c.TmdbId == tmdbId);
+        // Get movie details from cache - search across all provider caches
+        var allContent = _cacheService.GetAllUserContent(itemUserId);
+        ContentItem? contentItem = null;
+
+        foreach (var providerContent in allContent.Values)
+        {
+            contentItem = providerContent.FirstOrDefault(c => c.Type == ContentType.Movie && c.TmdbId == tmdbId);
+            if (contentItem != null)
+            {
+                break;
+            }
+        }
 
         if (contentItem == null)
         {
@@ -221,9 +230,18 @@ public class PlaybackInterceptor : IHostedService
             return;
         }
 
-        // Get show details from cache
-        var cachedContent = _cacheService.GetCachedContent(itemUserId, "recommendations");
-        var contentItem = cachedContent.FirstOrDefault(c => c.Type == ContentType.Show && c.TvdbId == tvdbId);
+        // Get show details from cache - search across all provider caches
+        var allContent = _cacheService.GetAllUserContent(itemUserId);
+        ContentItem? contentItem = null;
+
+        foreach (var providerContent in allContent.Values)
+        {
+            contentItem = providerContent.FirstOrDefault(c => c.Type == ContentType.Show && c.TvdbId == tvdbId);
+            if (contentItem != null)
+            {
+                break;
+            }
+        }
 
         if (contentItem == null)
         {
