@@ -327,7 +327,7 @@ public class PlaybackInterceptor : IHostedService
         }
     }
 
-    private async void OnPlaybackStopped(object? sender, PlaybackProgressEventArgs e)
+    private void OnPlaybackStopped(object? sender, PlaybackProgressEventArgs e)
     {
         try
         {
@@ -348,15 +348,18 @@ public class PlaybackInterceptor : IHostedService
             {
                 // Clear state for the episode
                 var userData = _userDataManager.GetUserData(user, e.Item);
-                userData.PlaybackPositionTicks = 0;
-                userData.Played = false;
-                userData.LastPlayedDate = null;
-                _userDataManager.SaveUserData(
-                    user,
-                    e.Item,
-                    userData,
-                    UserDataSaveReason.UpdateUserData,
-                    CancellationToken.None);
+                if (userData != null)
+                {
+                    userData.PlaybackPositionTicks = 0;
+                    userData.Played = false;
+                    userData.LastPlayedDate = null;
+                    _userDataManager.SaveUserData(
+                        user,
+                        e.Item,
+                        userData,
+                        UserDataSaveReason.UpdateUserData,
+                        CancellationToken.None);
+                }
 
                 // Also clear state for the parent series (if it exists)
                 // This prevents the series from appearing in "Next Up"
@@ -364,15 +367,18 @@ public class PlaybackInterceptor : IHostedService
                 if (parent != null)
                 {
                     var parentData = _userDataManager.GetUserData(user, parent);
-                    parentData.PlaybackPositionTicks = 0;
-                    parentData.Played = false;
-                    parentData.LastPlayedDate = null;
-                    _userDataManager.SaveUserData(
-                        user,
-                        parent,
-                        parentData,
-                        UserDataSaveReason.UpdateUserData,
-                        CancellationToken.None);
+                    if (parentData != null)
+                    {
+                        parentData.PlaybackPositionTicks = 0;
+                        parentData.Played = false;
+                        parentData.LastPlayedDate = null;
+                        _userDataManager.SaveUserData(
+                            user,
+                            parent,
+                            parentData,
+                            UserDataSaveReason.UpdateUserData,
+                            CancellationToken.None);
+                    }
                 }
             }
         }

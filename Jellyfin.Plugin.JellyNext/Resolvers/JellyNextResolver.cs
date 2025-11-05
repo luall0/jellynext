@@ -121,7 +121,7 @@ public class JellyNextResolver : IItemResolver
         };
     }
 
-    private Folder CreateMoviesFolder(Guid _)
+    private Folder CreateMoviesFolder(Guid userId)
     {
         return new Folder
         {
@@ -135,7 +135,7 @@ public class JellyNextResolver : IItemResolver
         };
     }
 
-    private Movie? CreateMovieItem(Guid userId, string itemId, ItemResolveArgs _)
+    private Movie? CreateMovieItem(Guid userId, string itemId, ItemResolveArgs args)
     {
         // Get cached recommendations
         var cachedContent = _cacheService.GetCachedContent(userId, "recommendations");
