@@ -6,7 +6,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.JellyNext.Models;
+using Jellyfin.Plugin.JellyNext.Models.Common;
+using Jellyfin.Plugin.JellyNext.Models.Radarr;
+using Jellyfin.Plugin.JellyNext.Models.Sonarr;
+using Jellyfin.Plugin.JellyNext.Models.Trakt;
 using MediaBrowser.Common.Net;
 using Microsoft.Extensions.Logging;
 

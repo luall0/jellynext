@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Radarr;
 
 /// <summary>
 /// Represents a movie in Radarr.

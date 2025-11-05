@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Radarr;
 
 /// <summary>
 /// Represents add options for a Radarr movie.

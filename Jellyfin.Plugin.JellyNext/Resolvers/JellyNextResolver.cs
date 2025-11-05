@@ -1,7 +1,10 @@
 using System;
 using System.Globalization;
 using System.Linq;
-using Jellyfin.Plugin.JellyNext.Models;
+using Jellyfin.Plugin.JellyNext.Models.Common;
+using Jellyfin.Plugin.JellyNext.Models.Radarr;
+using Jellyfin.Plugin.JellyNext.Models.Sonarr;
+using Jellyfin.Plugin.JellyNext.Models.Trakt;
 using Jellyfin.Plugin.JellyNext.Services;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;

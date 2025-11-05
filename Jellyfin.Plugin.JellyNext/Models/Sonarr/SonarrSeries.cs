@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Sonarr;
 
 /// <summary>
 /// Represents a series in Sonarr.

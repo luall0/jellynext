@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.JellyNext.Models;
+using Jellyfin.Plugin.JellyNext.Models.Common;
+using Jellyfin.Plugin.JellyNext.Models.Radarr;
+using Jellyfin.Plugin.JellyNext.Models.Sonarr;
+using Jellyfin.Plugin.JellyNext.Models.Trakt;
 
 namespace Jellyfin.Plugin.JellyNext.Providers;
 

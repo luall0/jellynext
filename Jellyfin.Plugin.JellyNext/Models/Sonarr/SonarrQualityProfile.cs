@@ -1,11 +1,11 @@
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Sonarr;
 
 /// <summary>
-/// Represents a Radarr quality profile.
+/// Represents a Sonarr quality profile.
 /// </summary>
-public class RadarrQualityProfile
+public class SonarrQualityProfile
 {
     /// <summary>
     /// Gets or sets the quality profile ID.

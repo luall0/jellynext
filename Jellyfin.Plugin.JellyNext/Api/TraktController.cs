@@ -42,7 +42,7 @@ public class TraktController : ControllerBase
     [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<object>> AuthorizeUser([FromRoute] [Required] Guid userGuid)
+    public async Task<ActionResult<object>> AuthorizeUser([FromRoute][Required] Guid userGuid)
     {
         try
         {
@@ -82,7 +82,7 @@ public class TraktController : ControllerBase
     [HttpGet("Users/{userGuid}/AuthorizationStatus")]
     [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<object> GetAuthorizationStatus([FromRoute] [Required] Guid userGuid)
+    public ActionResult<object> GetAuthorizationStatus([FromRoute][Required] Guid userGuid)
     {
         var traktUser = UserHelper.GetTraktUser(userGuid);
         var isAuthorized = traktUser != null &&
@@ -101,7 +101,7 @@ public class TraktController : ControllerBase
     [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult DeauthorizeUser([FromRoute] [Required] Guid userGuid)
+    public ActionResult DeauthorizeUser([FromRoute][Required] Guid userGuid)
     {
         var traktUser = UserHelper.GetTraktUser(userGuid);
         if (traktUser == null)

@@ -1,14 +1,14 @@
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Sonarr;
 
 /// <summary>
-/// Represents Radarr system status.
+/// Represents Sonarr system status.
 /// </summary>
-public class RadarrSystemStatus
+public class SonarrSystemStatus
 {
     /// <summary>
-    /// Gets or sets the Radarr version.
+    /// Gets or sets the Sonarr version.
     /// </summary>
     [JsonPropertyName("version")]
     public string Version { get; set; } = string.Empty;

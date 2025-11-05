@@ -1,26 +1,26 @@
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Trakt;
 
 /// <summary>
-/// Represents a Trakt movie.
+/// Represents a Trakt TV show.
 /// </summary>
-public class TraktMovie
+public class TraktShow
 {
     /// <summary>
-    /// Gets or sets the movie title.
+    /// Gets or sets the show title.
     /// </summary>
     [JsonPropertyName("title")]
     public string Title { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the movie year.
+    /// Gets or sets the show year.
     /// </summary>
     [JsonPropertyName("year")]
     public int? Year { get; set; }
 
     /// <summary>
-    /// Gets or sets the movie IDs.
+    /// Gets or sets the show IDs.
     /// </summary>
     [JsonPropertyName("ids")]
     public TraktIds Ids { get; set; } = new TraktIds();

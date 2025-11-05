@@ -1,11 +1,11 @@
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Radarr;
 
 /// <summary>
-/// Represents a Sonarr root folder.
+/// Represents a Radarr root folder.
 /// </summary>
-public class SonarrRootFolder
+public class RadarrRootFolder
 {
     /// <summary>
     /// Gets or sets the root folder ID.

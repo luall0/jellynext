@@ -2,7 +2,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using Jellyfin.Plugin.JellyNext.Models;
+using Jellyfin.Plugin.JellyNext.Models.Common;
+using Jellyfin.Plugin.JellyNext.Models.Radarr;
+using Jellyfin.Plugin.JellyNext.Models.Sonarr;
+using Jellyfin.Plugin.JellyNext.Models.Trakt;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.JellyNext.Services;

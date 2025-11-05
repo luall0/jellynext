@@ -1,6 +1,6 @@
 using System;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Trakt;
 
 /// <summary>
 /// Represents a Jellyfin user's Trakt account configuration and OAuth tokens.

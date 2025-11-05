@@ -1,6 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.JellyNext.Models;
+using Jellyfin.Plugin.JellyNext.Models.Common;
+using Jellyfin.Plugin.JellyNext.Models.Radarr;
+using Jellyfin.Plugin.JellyNext.Models.Sonarr;
+using Jellyfin.Plugin.JellyNext.Models.Trakt;
 using Jellyfin.Plugin.JellyNext.Services;
 using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
@@ -43,8 +46,8 @@ public class RadarrController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<RadarrTestConnectionResponse>> TestConnection(
-        [FromQuery] [Required] string radarrUrl,
-        [FromQuery] [Required] string apiKey)
+        [FromQuery][Required] string radarrUrl,
+        [FromQuery][Required] string apiKey)
     {
         _logger.LogInformation("Testing Radarr connection to {Url}", radarrUrl);
 

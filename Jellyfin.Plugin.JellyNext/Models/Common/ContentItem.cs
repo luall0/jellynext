@@ -1,6 +1,6 @@
 using System;
 
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Common;
 
 /// <summary>
 /// Represents a content item (movie or show) from an external source.

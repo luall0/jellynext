@@ -1,4 +1,4 @@
-namespace Jellyfin.Plugin.JellyNext.Models;
+namespace Jellyfin.Plugin.JellyNext.Models.Common;
 
 /// <summary>
 /// Content type enumeration.
