@@ -67,7 +67,6 @@ public class NextSeasonsProvider : IContentProvider
 
             if (watchedShows.Length == 0)
             {
-                _logger.LogInformation("No watched shows found for user {UserId}", userId);
                 return Array.Empty<ContentItem>();
             }
 
@@ -84,9 +83,6 @@ public class NextSeasonsProvider : IContentProvider
                     // Skip shows without TVDB ID (we need it to match with local library)
                     if (watchedShow.Show.Ids.Tvdb == null || watchedShow.Show.Ids.Tvdb == 0)
                     {
-                        _logger.LogInformation(
-                            "Skipping {Title} - no TVDB ID available",
-                            watchedShow.Show.Title);
                         continue;
                     }
 
@@ -99,16 +95,8 @@ public class NextSeasonsProvider : IContentProvider
                         .OrderByDescending(s => s)
                         .ToList();
 
-                    _logger.LogInformation(
-                        "{Title} - Watched seasons: {Seasons}",
-                        watchedShow.Show.Title,
-                        string.Join(", ", watchedSeasons));
-
                     if (!watchedSeasons.Any())
                     {
-                        _logger.LogInformation(
-                            "Skipping {Title} - no watched regular seasons",
-                            watchedShow.Show.Title);
                         continue;
                     }
 
@@ -130,9 +118,6 @@ public class NextSeasonsProvider : IContentProvider
 
                     if (availableSeasons == null || availableSeasons.Length == 0)
                     {
-                        _logger.LogDebug(
-                            "No season information available for {Title}",
-                            watchedShow.Show.Title);
                         continue;
                     }
 
@@ -143,60 +128,20 @@ public class NextSeasonsProvider : IContentProvider
                         .Select(s => s.Number)
                         .ToHashSet();
 
-                    _logger.LogInformation(
-                        "{Title} - Available seasons on Trakt: {Seasons}",
-                        watchedShow.Show.Title,
-                        string.Join(", ", availableSeasonNumbers.OrderBy(s => s)));
-
                     // Find the highest watched season
                     var highestWatchedSeason = watchedSeasons.First(); // Already ordered descending
                     var nextSeasonNumber = highestWatchedSeason + 1;
 
-                    _logger.LogInformation(
-                        "{Title} - Highest watched season: {HighestSeason}, looking for next season: {NextSeason}",
-                        watchedShow.Show.Title,
-                        highestWatchedSeason,
-                        nextSeasonNumber);
-
                     // Check if this next season has been released (exists in Trakt)
                     if (!availableSeasonNumbers.Contains(nextSeasonNumber))
                     {
-                        _logger.LogInformation(
-                            "{Title} - Season {Season} has not been released yet",
-                            watchedShow.Show.Title,
-                            nextSeasonNumber);
                         continue;
                     }
 
                     // Check if this next season exists locally
                     var existsLocally = _localLibraryService.DoesSeasonExist(tvdbId, nextSeasonNumber);
 
-                    _logger.LogInformation(
-                        "{Title} - Season {Season} exists locally: {ExistsLocally}",
-                        watchedShow.Show.Title,
-                        nextSeasonNumber,
-                        existsLocally);
-
-                    var nextSeasonCandidates = new HashSet<int>();
                     if (!existsLocally)
-                    {
-                        // This is the next season to download
-                        nextSeasonCandidates.Add(nextSeasonNumber);
-                        _logger.LogInformation(
-                            "{Title} - Added season {Season} as next season candidate",
-                            watchedShow.Show.Title,
-                            nextSeasonNumber);
-                    }
-                    else
-                    {
-                        _logger.LogInformation(
-                            "{Title} - Season {Season} already exists locally, not suggesting",
-                            watchedShow.Show.Title,
-                            nextSeasonNumber);
-                    }
-
-                    // Add content items for each next season candidate
-                    foreach (var seasonNumber in nextSeasonCandidates)
                     {
                         contentItems.Add(new ContentItem
                         {
@@ -208,13 +153,8 @@ public class NextSeasonsProvider : IContentProvider
                             TvdbId = watchedShow.Show.Ids.Tvdb,
                             TraktId = watchedShow.Show.Ids.Trakt,
                             ProviderName = ProviderName,
-                            SeasonNumber = seasonNumber
+                            SeasonNumber = nextSeasonNumber
                         });
-
-                        _logger.LogDebug(
-                            "Added next season candidate: {Title} - Season {Season}",
-                            watchedShow.Show.Title,
-                            seasonNumber);
                     }
                 }
                 catch (Exception ex)

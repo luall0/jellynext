@@ -387,28 +387,6 @@ public class TraktApi
             return Array.Empty<TraktSeason>();
         }
 
-        if (seasons != null)
-        {
-            _logger.LogInformation(
-                "Trakt ID {TraktId} - Retrieved {Count} seasons from API",
-                traktId,
-                seasons.Length);
-
-            foreach (var season in seasons)
-            {
-                _logger.LogInformation(
-                    "  Season {Number}: {EpisodeCount} episodes, {AiredCount} aired (first aired: {FirstAired})",
-                    season.Number,
-                    season.EpisodeCount,
-                    season.AiredEpisodes,
-                    season.FirstAired?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "unknown");
-            }
-        }
-        else
-        {
-            _logger.LogWarning("Trakt ID {TraktId} - Seasons deserialized to null", traktId);
-        }
-
         return seasons ?? Array.Empty<TraktSeason>();
     }
 }
