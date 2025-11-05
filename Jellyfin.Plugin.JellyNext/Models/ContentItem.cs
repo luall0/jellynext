@@ -51,4 +51,9 @@ public class ContentItem
     /// Gets or sets the Trakt ID.
     /// </summary>
     public int TraktId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the season number (for next seasons provider).
+    /// </summary>
+    public int? SeasonNumber { get; set; }
 }

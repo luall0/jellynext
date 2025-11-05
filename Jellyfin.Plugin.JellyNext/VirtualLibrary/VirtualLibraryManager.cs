@@ -207,6 +207,13 @@ public class VirtualLibraryManager
             _logger.LogInformation("      Library Type: Shows");
             _logger.LogInformation("      Suggested Name: \"[Your Username]'s Shows Recommendations\"");
 
+            // Next Seasons
+            var nextSeasonsPath = GetUserLibraryPath(userId, VirtualLibraryContentType.ShowsNextSeasons);
+            _logger.LogInformation("  [3] Next Seasons:");
+            _logger.LogInformation("      Path: {Path}", nextSeasonsPath);
+            _logger.LogInformation("      Library Type: Shows");
+            _logger.LogInformation("      Suggested Name: \"[Your Username]'s Next Seasons\"");
+
             _logger.LogInformation("  Setup Instructions:");
             _logger.LogInformation("    1. Go to Jellyfin Dashboard → Libraries → Add Media Library");
             _logger.LogInformation("    2. For EACH content type above, create a SEPARATE library:");
@@ -246,6 +253,7 @@ public class VirtualLibraryManager
                 var userId = traktUser.LinkedMbUserId;
                 RefreshStubFilesForUser(userId, VirtualLibraryContentType.MoviesRecommendations);
                 RefreshStubFilesForUser(userId, VirtualLibraryContentType.ShowsRecommendations);
+                RefreshStubFilesForUser(userId, VirtualLibraryContentType.ShowsNextSeasons);
                 // Future: Add watchlist content types here
             }
 
@@ -364,6 +372,10 @@ public class VirtualLibraryManager
                     }
                 }
 
+                // Determine if this is next seasons content (one stub per show for specific season)
+                // or regular show content (multiple stubs for seasons 1-10)
+                var isNextSeasons = contentType == VirtualLibraryContentType.ShowsNextSeasons;
+
                 // Create new show folders with per-season .strm files
                 foreach (var item in items)
                 {
@@ -378,26 +390,50 @@ public class VirtualLibraryManager
                         Directory.CreateDirectory(showFolder);
                     }
 
-                    // Create per-season .strm files as fake episodes (seasons 1-10)
-                    // Format: S01E01 - Download Season 1.strm (Jellyfin treats these as episodes)
-                    // Users can trigger downloads for higher seasons manually
-                    for (int seasonNumber = 1; seasonNumber <= 10; seasonNumber++)
+                    if (isNextSeasons && item.SeasonNumber.HasValue)
                     {
+                        // For next seasons: create only ONE stub file for the specific season
+                        var seasonNumber = item.SeasonNumber.Value;
                         var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
                         var stubFile = Path.Combine(showFolder, seasonFileName);
 
                         if (!File.Exists(stubFile))
                         {
-                            // Point to dummy video file for FFprobe compatibility
-                            // Playback interceptor will extract season number from filename pattern S##E##
                             var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
                                 ? _dummyVideoPath
-                                : "http://jellynext-placeholder/show"; // Fallback if dummy video creation failed
+                                : "http://jellynext-placeholder/show";
                             File.WriteAllText(stubFile, content);
                         }
-                    }
 
-                    _logger.LogDebug("Created show folder with per-season stubs: {Title} ({Year})", item.Title, year);
+                        _logger.LogDebug(
+                            "Created next season stub: {Title} ({Year}) - Season {Season}",
+                            item.Title,
+                            year,
+                            seasonNumber);
+                    }
+                    else
+                    {
+                        // For regular shows: create per-season .strm files as fake episodes (seasons 1-10)
+                        // Format: S01E01 - Download Season 1.strm (Jellyfin treats these as episodes)
+                        // Users can trigger downloads for higher seasons manually
+                        for (int seasonNumber = 1; seasonNumber <= 10; seasonNumber++)
+                        {
+                            var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
+                            var stubFile = Path.Combine(showFolder, seasonFileName);
+
+                            if (!File.Exists(stubFile))
+                            {
+                                // Point to dummy video file for FFprobe compatibility
+                                // Playback interceptor will extract season number from filename pattern S##E##
+                                var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
+                                    ? _dummyVideoPath
+                                    : "http://jellynext-placeholder/show"; // Fallback if dummy video creation failed
+                                File.WriteAllText(stubFile, content);
+                            }
+                        }
+
+                        _logger.LogDebug("Created show folder with per-season stubs: {Title} ({Year})", item.Title, year);
+                    }
                 }
             }
         }

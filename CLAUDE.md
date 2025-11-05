@@ -327,6 +327,7 @@ Jellyfin.Plugin.JellyNext/
 
 **Current Providers:**
 - `RecommendationsProvider` - Fetches movie + show recommendations (up to 50 each)
+- `NextSeasonsProvider` - Fetches next seasons for actively watched shows (only aired seasons not in library)
 
 ### ✅ Per-User Native Virtual Libraries
 **Architecture:**
@@ -632,6 +633,64 @@ Jellyfin.Plugin.JellyNext/
   - Also clears parent series state using `GetParent()` - critical for TV shows
   - Must happen in `PlaybackStopped` (not `PlaybackStart`) because Jellyfin saves position after stop event
 - User requires `IUserDataManager` and `IUserManager` (Jellyfin 10.11 API uses `User` objects, not `Guid`)
+
+### ✅ Next Seasons Provider
+**Purpose:**
+- Suggests next seasons of shows the user is actively watching based on Trakt watch history
+- Only suggests seasons that: (1) have aired, (2) are the immediate next season after the highest watched season, (3) don't exist locally
+
+**Architecture:**
+- `NextSeasonsProvider` - Implements `IContentProvider` interface
+- `LocalLibraryService` - Queries Jellyfin library to check which seasons exist locally
+- `TraktApi.GetWatchedShows()` - Fetches user's watch history with season/episode progress
+- `TraktApi.GetShowSeasons()` - Fetches season metadata including aired episode counts
+
+**Models:**
+- `TraktWatchedShow` - Watch history with seasons array
+- `TraktShowSeasonProgress` - Season numbers with watched episodes
+- `TraktEpisodeProgress` - Episode-level watch timestamps
+- `TraktSeason` - Season metadata (`number`, `episode_count`, `aired_episodes`, `first_aired`)
+- `TraktSeasonEpisode` - Episode details with air dates
+- `ContentItem.SeasonNumber` - Extended to support specific season tracking
+
+**Discovery Logic:**
+1. Fetch user's watched shows from Trakt (`/sync/watched/shows`)
+2. For each show with TVDB ID:
+   - Find highest watched season (seasons sorted descending)
+   - Calculate next season number (highest + 1)
+   - Fetch season metadata from Trakt (`/shows/{id}/seasons?extended=full`)
+   - Filter seasons to only those with `aired_episodes > 0`
+   - Check if next season exists in Trakt's available seasons
+   - Check if next season exists locally via `LocalLibraryService.DoesSeasonExist()`
+   - If released AND not local: add to suggestions
+
+**LocalLibraryService Methods:**
+- `FindSeriesByTvdbId(tvdbId)` - Locates series in Jellyfin by TVDB provider ID
+- `GetLocalSeasons(series)` - Returns set of season numbers present locally
+- `DoesSeasonExist(tvdbId, seasonNumber)` - Checks if specific season downloaded
+
+**Key Filtering:**
+- **Excludes specials**: Season 0 ignored
+- **Only aired content**: Seasons must have `aired_episodes > 0` (from Trakt API)
+- **One season per show**: Only suggests immediate next season, not all missing seasons
+- **Local check**: Uses TVDB ID matching to verify season presence in Jellyfin
+
+**Example Scenarios:**
+- User watched Seasons 1-2 of "Invasion", Season 3 aired but not local → **Suggests Season 3** ✓
+- User watched all 7 seasons of "Star Trek TNG", no Season 8 exists → **Suggests nothing** ✓
+- User watched Season 6, Season 7 aired and exists locally → **Suggests nothing** ✓
+- User watched Season 2, Season 3 announced but not aired → **Suggests nothing** ✓
+
+**Virtual Library Integration:**
+- Content type: `VirtualLibraryContentType.ShowsNextSeasons`
+- Directory: `jellynext-virtual/{userId}/shows_nextseasons/`
+- Stub file format: `{Title} ({Year}) [tvdbid-{ID}]/S{Season:D2}E01 - Download Season {Season}.strm`
+- Only ONE stub file per show (for the specific next season, not seasons 1-10)
+- `VirtualLibraryManager` detects `isNextSeasons` flag to create single stub vs. multiple
+
+**Trakt API Endpoints Used:**
+- `GET /sync/watched/shows` - User's watch history
+- `GET /shows/{traktId}/seasons?extended=full` - Season metadata with aired counts
 
 ## Core Workflows
 

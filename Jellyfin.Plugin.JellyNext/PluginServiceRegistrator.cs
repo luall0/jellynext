@@ -23,9 +23,11 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ContentCacheService>();
         serviceCollection.AddSingleton<RadarrService>();
         serviceCollection.AddSingleton<SonarrService>();
+        serviceCollection.AddSingleton<LocalLibraryService>();
 
         // Content providers
         serviceCollection.AddSingleton<IContentProvider, RecommendationsProvider>();
+        serviceCollection.AddSingleton<IContentProvider, NextSeasonsProvider>();
 
         // Sync service (must be registered after providers)
         serviceCollection.AddSingleton<ContentSyncService>();

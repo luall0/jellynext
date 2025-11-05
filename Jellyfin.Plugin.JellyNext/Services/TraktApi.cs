@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -325,5 +326,90 @@ public class TraktApi
 
         var shows = await response.Content.ReadFromJsonAsync<TraktShow[]>(_jsonOptions);
         return shows ?? Array.Empty<TraktShow>();
+    }
+
+    /// <summary>
+    /// Gets the user's watched shows with season/episode progress.
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration.</param>
+    /// <returns>List of watched shows with progress information.</returns>
+    public async Task<TraktWatchedShow[]> GetWatchedShows(TraktUser traktUser)
+    {
+        using var httpClient = await CreateTraktClient(traktUser);
+        var response = await httpClient.GetAsync("/sync/watched/shows");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError(
+                "Failed to get watched shows: Status={Status}, Content={Content}",
+                response.StatusCode,
+                errorContent);
+            return Array.Empty<TraktWatchedShow>();
+        }
+
+        var watchedShows = await response.Content.ReadFromJsonAsync<TraktWatchedShow[]>(_jsonOptions);
+        return watchedShows ?? Array.Empty<TraktWatchedShow>();
+    }
+
+    /// <summary>
+    /// Gets all seasons for a show by Trakt ID.
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration.</param>
+    /// <param name="traktId">The Trakt show ID.</param>
+    /// <returns>List of seasons for the show.</returns>
+    public async Task<TraktSeason[]> GetShowSeasons(TraktUser traktUser, int traktId)
+    {
+        using var httpClient = await CreateTraktClient(traktUser);
+        var response = await httpClient.GetAsync($"/shows/{traktId}/seasons?extended=full");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError(
+                "Failed to get show seasons for Trakt ID {TraktId}: Status={Status}, Content={Content}",
+                traktId,
+                response.StatusCode,
+                errorContent);
+            return Array.Empty<TraktSeason>();
+        }
+
+        var responseContent = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation("Trakt API response for show {TraktId} seasons (first 1000 chars): {Response}", traktId, responseContent.Length > 1000 ? responseContent.Substring(0, 1000) + "..." : responseContent);
+
+        TraktSeason[]? seasons = null;
+        try
+        {
+            seasons = System.Text.Json.JsonSerializer.Deserialize<TraktSeason[]>(responseContent, _jsonOptions);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to deserialize Trakt seasons for show {TraktId}", traktId);
+            return Array.Empty<TraktSeason>();
+        }
+
+        if (seasons != null)
+        {
+            _logger.LogInformation(
+                "Trakt ID {TraktId} - Retrieved {Count} seasons from API",
+                traktId,
+                seasons.Length);
+
+            foreach (var season in seasons)
+            {
+                _logger.LogInformation(
+                    "  Season {Number}: {EpisodeCount} episodes, {AiredCount} aired (first aired: {FirstAired})",
+                    season.Number,
+                    season.EpisodeCount,
+                    season.AiredEpisodes,
+                    season.FirstAired?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "unknown");
+            }
+        }
+        else
+        {
+            _logger.LogWarning("Trakt ID {TraktId} - Seasons deserialized to null", traktId);
+        }
+
+        return seasons ?? Array.Empty<TraktSeason>();
     }
 }

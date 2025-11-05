@@ -23,7 +23,12 @@ public enum VirtualLibraryContentType
     /// <summary>
     /// Trakt show watchlist.
     /// </summary>
-    WatchlistShows
+    WatchlistShows,
+
+    /// <summary>
+    /// Next seasons of watched shows.
+    /// </summary>
+    ShowsNextSeasons
 }
 
 /// <summary>
@@ -44,6 +49,7 @@ public static class VirtualLibraryContentTypeHelper
             VirtualLibraryContentType.ShowsRecommendations => "shows_recommendations",
             VirtualLibraryContentType.WatchlistMovies => "watchlist_movies",
             VirtualLibraryContentType.WatchlistShows => "watchlist_shows",
+            VirtualLibraryContentType.ShowsNextSeasons => "shows_nextseasons",
             _ => throw new System.ArgumentOutOfRangeException(nameof(contentType), contentType, null)
         };
     }
@@ -61,6 +67,7 @@ public static class VirtualLibraryContentTypeHelper
             VirtualLibraryContentType.ShowsRecommendations => "recommendations",
             VirtualLibraryContentType.WatchlistMovies => "watchlist",
             VirtualLibraryContentType.WatchlistShows => "watchlist",
+            VirtualLibraryContentType.ShowsNextSeasons => "nextseasons",
             _ => throw new System.ArgumentOutOfRangeException(nameof(contentType), contentType, null)
         };
     }
@@ -78,6 +85,7 @@ public static class VirtualLibraryContentTypeHelper
             VirtualLibraryContentType.ShowsRecommendations => "Show Recommendations",
             VirtualLibraryContentType.WatchlistMovies => "Movie Watchlist",
             VirtualLibraryContentType.WatchlistShows => "Show Watchlist",
+            VirtualLibraryContentType.ShowsNextSeasons => "Next Seasons",
             _ => throw new System.ArgumentOutOfRangeException(nameof(contentType), contentType, null)
         };
     }
@@ -95,6 +103,7 @@ public static class VirtualLibraryContentTypeHelper
             VirtualLibraryContentType.ShowsRecommendations => "Shows",
             VirtualLibraryContentType.WatchlistMovies => "Movies",
             VirtualLibraryContentType.WatchlistShows => "Shows",
+            VirtualLibraryContentType.ShowsNextSeasons => "Shows",
             _ => throw new System.ArgumentOutOfRangeException(nameof(contentType), contentType, null)
         };
     }
@@ -113,9 +122,10 @@ public static class VirtualLibraryContentTypeHelper
             "shows_recommendations" => VirtualLibraryContentType.ShowsRecommendations,
             "watchlist_movies" => VirtualLibraryContentType.WatchlistMovies,
             "watchlist_shows" => VirtualLibraryContentType.WatchlistShows,
+            "shows_nextseasons" => VirtualLibraryContentType.ShowsNextSeasons,
             _ => default
         };
 
-        return directoryName is "movies_recommendations" or "shows_recommendations" or "watchlist_movies" or "watchlist_shows";
+        return directoryName is "movies_recommendations" or "shows_recommendations" or "watchlist_movies" or "watchlist_shows" or "shows_nextseasons";
     }
 }

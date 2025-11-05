@@ -14,8 +14,8 @@ services:
       - DOTNET_EnableDiagnostics=1
     volumes:
       # Mount the built plugin DLL
-      - ./Jellyfin.Plugin.JellyNext/bin/Release/net9.0/Jellyfin.Plugin.JellyNext.dll:/config/plugins/JellyNext_1.0.0.0/Jellyfin.Plugin.JellyNext.dll:ro
-      - ./Jellyfin.Plugin.JellyNext/bin/Release/net9.0/Jellyfin.Plugin.JellyNext.pdb:/config/plugins/JellyNext_1.0.0.0/Jellyfin.Plugin.JellyNext.pdb:ro
+      - ./Jellyfin.Plugin.JellyNext/bin/Debug/net9.0/Jellyfin.Plugin.JellyNext.dll:/config/plugins/JellyNext_1.0.0.0/Jellyfin.Plugin.JellyNext.dll:ro
+      - ./Jellyfin.Plugin.JellyNext/bin/Debug/net9.0/Jellyfin.Plugin.JellyNext.pdb:/config/plugins/JellyNext_1.0.0.0/Jellyfin.Plugin.JellyNext.pdb:ro
       # Jellyfin data persistence (optional, comment out for clean start each time)
       - ./jellyfin-config:/config
       - jellyfin-cache:/cache
