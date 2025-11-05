@@ -45,6 +45,7 @@ public class LocalLibraryService
 
         return allItems
             .OfType<Series>()
+            .Where(s => !s.Path?.Contains("jellynext-virtual", StringComparison.OrdinalIgnoreCase) ?? true)
             .FirstOrDefault(s => s.GetProviderId(MetadataProvider.Tvdb) == tvdbId.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
@@ -66,6 +67,12 @@ public class LocalLibraryService
 
         foreach (var item in seasonItems.OfType<Season>())
         {
+            // Skip virtual items created by this plugin
+            if (item.Path?.Contains("jellynext-virtual", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                continue;
+            }
+
             if (item.IndexNumber.HasValue)
             {
                 seasons.Add(item.IndexNumber.Value);
