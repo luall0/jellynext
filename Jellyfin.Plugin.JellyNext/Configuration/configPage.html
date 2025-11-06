@@ -41,9 +41,77 @@
                                 <div class="fieldDescription" style="margin-bottom: 1em; color: #52B54B;">
                                     ✓ This user has authorized their Trakt account.
                                 </div>
-                                <button is="emby-button" type="button" id="DeauthorizeBtn" class="raised button-cancel">
-                                    <span>Unlink Trakt Account</span>
-                                </button>
+
+                                <!-- Per-User Settings -->
+                                <div class="verticalSection" style="margin-top: 1.5em;">
+                                    <h4 class="sectionTitle" style="font-size: 1em;">Sync Options</h4>
+                                    <div class="checkboxContainer checkboxContainer-withDescription">
+                                        <label>
+                                            <input is="emby-checkbox" type="checkbox" id="UserSyncMovieRecommendations" />
+                                            <span>Sync Movie Recommendations</span>
+                                        </label>
+                                        <div class="fieldDescription checkboxFieldDescription">
+                                            Enable movie recommendations for this user
+                                        </div>
+                                    </div>
+                                    <div class="checkboxContainer checkboxContainer-withDescription">
+                                        <label>
+                                            <input is="emby-checkbox" type="checkbox" id="UserSyncShowRecommendations" />
+                                            <span>Sync Show Recommendations</span>
+                                        </label>
+                                        <div class="fieldDescription checkboxFieldDescription">
+                                            Enable show recommendations for this user
+                                        </div>
+                                    </div>
+                                    <div class="checkboxContainer checkboxContainer-withDescription">
+                                        <label>
+                                            <input is="emby-checkbox" type="checkbox" id="UserSyncNextSeasons" />
+                                            <span>Sync Next Seasons</span>
+                                        </label>
+                                        <div class="fieldDescription checkboxFieldDescription">
+                                            Enable next season suggestions for this user
+                                        </div>
+                                    </div>
+
+                                    <h4 class="sectionTitle" style="font-size: 1em; margin-top: 1.5em;">Recommendation Filters</h4>
+                                    <div class="checkboxContainer checkboxContainer-withDescription">
+                                        <label>
+                                            <input is="emby-checkbox" type="checkbox" id="UserIgnoreCollected" />
+                                            <span>Ignore Collected Items</span>
+                                        </label>
+                                        <div class="fieldDescription checkboxFieldDescription">
+                                            Hide movies and shows you've already added to your Trakt collection from recommendations
+                                        </div>
+                                    </div>
+                                    <div class="checkboxContainer checkboxContainer-withDescription">
+                                        <label>
+                                            <input is="emby-checkbox" type="checkbox" id="UserIgnoreWatchlisted" />
+                                            <span>Ignore Watchlisted Items</span>
+                                        </label>
+                                        <div class="fieldDescription checkboxFieldDescription">
+                                            Hide movies and shows in your Trakt watchlist from recommendations
+                                        </div>
+                                    </div>
+                                    <div class="checkboxContainer checkboxContainer-withDescription">
+                                        <label>
+                                            <input is="emby-checkbox" type="checkbox" id="UserLimitShowsToSeasonOne" />
+                                            <span>Limit Shows to Season 1 Only</span>
+                                        </label>
+                                        <div class="fieldDescription checkboxFieldDescription">
+                                            Only create stubs for Season 1 of show recommendations. When disabled, stubs are created for all aired seasons. (Recommended for better Jellyfin scan performance)
+                                        </div>
+                                    </div>
+
+                                    <button is="emby-button" type="button" id="SaveUserSettingsBtn" class="raised button-submit" style="margin-top: 1em;">
+                                        <span>Save User Settings</span>
+                                    </button>
+                                </div>
+
+                                <div style="margin-top: 1.5em;">
+                                    <button is="emby-button" type="button" id="DeauthorizeBtn" class="raised button-cancel">
+                                        <span>Unlink Trakt Account</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div id="AuthorizingSection" style="display: none;">
@@ -150,38 +218,6 @@
                         </div>
                     </div>
 
-                    <!-- Recommendations Settings -->
-                    <div class="verticalSection">
-                        <h3 class="sectionTitle">Recommendations Settings</h3>
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="IgnoreCollected" name="IgnoreCollected" />
-                                <span>Ignore Collected Items</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Hide movies and shows you've already added to your Trakt collection from recommendations
-                            </div>
-                        </div>
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="IgnoreWatchlisted" name="IgnoreWatchlisted" />
-                                <span>Ignore Watchlisted Items</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Hide movies and shows in your Trakt watchlist from recommendations
-                            </div>
-                        </div>
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="LimitShowsToSeasonOne" name="LimitShowsToSeasonOne" />
-                                <span>Limit Shows to Season 1 Only</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">
-                                Only create stubs for Season 1 of show recommendations. When disabled, stubs are created for all aired seasons. (Recommended for better Jellyfin scan performance)
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Cache Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Cache Settings</h3>
@@ -270,7 +306,65 @@
                 document.getElementById('NotAuthorizedSection').style.display = 'none';
                 document.getElementById('AuthorizedSection').style.display = 'block';
                 document.getElementById('AuthorizingSection').style.display = 'none';
+                loadUserSettings();
             }
+
+            // Load user-specific settings
+            function loadUserSettings() {
+                if (!JellyNextConfig.currentUserGuid) {
+                    return;
+                }
+
+                ApiClient.fetch({
+                    type: 'GET',
+                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/Settings')
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (settings) {
+                    document.getElementById('UserSyncMovieRecommendations').checked = settings.syncMovieRecommendations !== false;
+                    document.getElementById('UserSyncShowRecommendations').checked = settings.syncShowRecommendations !== false;
+                    document.getElementById('UserSyncNextSeasons').checked = settings.syncNextSeasons !== false;
+                    document.getElementById('UserIgnoreCollected').checked = settings.ignoreCollected !== false;
+                    document.getElementById('UserIgnoreWatchlisted').checked = settings.ignoreWatchlisted === true;
+                    document.getElementById('UserLimitShowsToSeasonOne').checked = settings.limitShowsToSeasonOne !== false;
+                }).catch(function (error) {
+                    console.error('Error loading user settings:', error);
+                });
+            }
+
+            // Save user-specific settings
+            document.getElementById('SaveUserSettingsBtn').addEventListener('click', function () {
+                if (!JellyNextConfig.currentUserGuid) {
+                    return;
+                }
+
+                Dashboard.showLoadingMsg();
+
+                var settings = {
+                    syncMovieRecommendations: document.getElementById('UserSyncMovieRecommendations').checked,
+                    syncShowRecommendations: document.getElementById('UserSyncShowRecommendations').checked,
+                    syncNextSeasons: document.getElementById('UserSyncNextSeasons').checked,
+                    ignoreCollected: document.getElementById('UserIgnoreCollected').checked,
+                    ignoreWatchlisted: document.getElementById('UserIgnoreWatchlisted').checked,
+                    limitShowsToSeasonOne: document.getElementById('UserLimitShowsToSeasonOne').checked
+                };
+
+                ApiClient.fetch({
+                    type: 'POST',
+                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/Settings'),
+                    data: JSON.stringify(settings),
+                    contentType: 'application/json'
+                }).then(function (response) {
+                    return response.json();
+                }).then(function (result) {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('User settings saved successfully!');
+                }).catch(function (error) {
+                    Dashboard.hideLoadingMsg();
+                    console.error('Error saving user settings:', error);
+                    Dashboard.alert('Failed to save user settings');
+                });
+            });
 
             // Show authorizing state
             function showAuthorizingState(userCode) {
@@ -558,9 +652,6 @@
                     document.getElementById('RadarrApiKey').value = config.RadarrApiKey || '';
                     document.getElementById('SonarrUrl').value = config.SonarrUrl || '';
                     document.getElementById('SonarrApiKey').value = config.SonarrApiKey || '';
-                    document.getElementById('IgnoreCollected').checked = config.IgnoreCollected !== false;
-                    document.getElementById('IgnoreWatchlisted').checked = config.IgnoreWatchlisted === true;
-                    document.getElementById('LimitShowsToSeasonOne').checked = config.LimitShowsToSeasonOne === true;
                     document.getElementById('CacheExpirationHours').value = config.CacheExpirationHours || 6;
 
                     // If Radarr is configured, show a hint to test connection to see options
@@ -621,9 +712,6 @@
                         config.SonarrAnimeRootFolderPath = sonarrAnimeRootFolderPath;
                     }
 
-                    config.IgnoreCollected = document.getElementById('IgnoreCollected').checked;
-                    config.IgnoreWatchlisted = document.getElementById('IgnoreWatchlisted').checked;
-                    config.LimitShowsToSeasonOne = document.getElementById('LimitShowsToSeasonOne').checked;
                     config.CacheExpirationHours = parseInt(document.getElementById('CacheExpirationHours').value);
 
                     ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {

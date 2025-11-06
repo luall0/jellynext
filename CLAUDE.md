@@ -80,7 +80,7 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `PluginServiceRegistrator.cs`: All DI registrations (services, providers, resolvers, hosted services)
 
 **API Controllers** (`/Api/`):
-- `TraktController.cs`: OAuth device flow, token polling/refresh, user unlinking
+- `TraktController.cs`: OAuth device flow, token polling/refresh, user unlinking, per-user settings (GET/POST `/Users/{userGuid}/Settings`)
 - `RadarrController.cs`: Connection test, profile/folder retrieval, movie downloads
 - `SonarrController.cs`: Connection test, profile/folder retrieval, TV show/season downloads
 - `JellyNextLibraryController.cs`: Query cached content (recommendations, next seasons)
@@ -97,8 +97,8 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 
 **Providers** (`/Providers/`):
 - `IContentProvider.cs`: Interface (ProviderName, LibraryName, FetchContentAsync, IsEnabledForUser)
-- `RecommendationsProvider.cs`: Fetches Trakt recommendations (movies + shows), creates stubs for 10 seasons per show
-- `NextSeasonsProvider.cs`: Fetches immediate next unwatched season, creates single stub per show
+- `RecommendationsProvider.cs`: Fetches Trakt recommendations, respects per-user `SyncMovieRecommendations`/`SyncShowRecommendations` flags and filters (`IgnoreCollected`, `IgnoreWatchlisted`)
+- `NextSeasonsProvider.cs`: Fetches immediate next unwatched season, respects per-user `SyncNextSeasons` flag
 
 **Virtual Library** (`/VirtualLibrary/`):
 - `VirtualLibraryManager.cs`: Stub file creation/management, dummy.mp4 extraction, .keep file maintenance
@@ -168,8 +168,10 @@ Background: Plugin.PollingTasks[userGuid] = TraktApi.PollForTokenAsync()
 
 ### Per-User Architecture
 - Each user has own Trakt OAuth token (stored in `PluginConfiguration.TraktUsers[]`)
+- Per-user sync settings: `SyncMovieRecommendations`, `SyncShowRecommendations`, `SyncNextSeasons`, `IgnoreCollected`, `IgnoreWatchlisted`, `LimitShowsToSeasonOne` (all in `TraktUser` model)
 - Virtual libraries filtered by userId extracted from path
 - Access via `UserHelper.GetTraktUser(userGuid)`
+- Providers check `IsEnabledForUser()` which respects per-user sync flags
 
 ### Configuration Access
 Use `Plugin.Instance?.Configuration` not `Plugin.Instance?.PluginConfiguration` - `BasePlugin<T>` exposes as `Configuration`

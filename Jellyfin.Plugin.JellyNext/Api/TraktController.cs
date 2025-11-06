@@ -116,4 +116,100 @@ public class TraktController : ControllerBase
 
         return Ok(new { success = true });
     }
+
+    /// <summary>
+    /// Gets the user-specific Trakt settings.
+    /// </summary>
+    /// <param name="userGuid">The Jellyfin user GUID.</param>
+    /// <returns>The user settings.</returns>
+    [HttpGet("Users/{userGuid}/Settings")]
+    [Authorize(Policy = Policies.RequiresElevation)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<object> GetUserSettings([FromRoute][Required] Guid userGuid)
+    {
+        var traktUser = UserHelper.GetTraktUser(userGuid);
+        if (traktUser == null)
+        {
+            return NotFound(new { error = "Trakt user configuration not found" });
+        }
+
+        return Ok(new
+        {
+            syncMovieRecommendations = traktUser.SyncMovieRecommendations,
+            syncShowRecommendations = traktUser.SyncShowRecommendations,
+            syncNextSeasons = traktUser.SyncNextSeasons,
+            ignoreCollected = traktUser.IgnoreCollected,
+            ignoreWatchlisted = traktUser.IgnoreWatchlisted,
+            limitShowsToSeasonOne = traktUser.LimitShowsToSeasonOne
+        });
+    }
+
+    /// <summary>
+    /// Updates the user-specific Trakt settings.
+    /// </summary>
+    /// <param name="userGuid">The Jellyfin user GUID.</param>
+    /// <param name="settings">The updated settings.</param>
+    /// <returns>Success status.</returns>
+    [HttpPost("Users/{userGuid}/Settings")]
+    [Authorize(Policy = Policies.RequiresElevation)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult UpdateUserSettings([FromRoute][Required] Guid userGuid, [FromBody] UserSettingsDto settings)
+    {
+        var traktUser = UserHelper.GetTraktUser(userGuid);
+        if (traktUser == null)
+        {
+            return NotFound(new { error = "Trakt user configuration not found" });
+        }
+
+        traktUser.SyncMovieRecommendations = settings.SyncMovieRecommendations;
+        traktUser.SyncShowRecommendations = settings.SyncShowRecommendations;
+        traktUser.SyncNextSeasons = settings.SyncNextSeasons;
+        traktUser.IgnoreCollected = settings.IgnoreCollected;
+        traktUser.IgnoreWatchlisted = settings.IgnoreWatchlisted;
+        traktUser.LimitShowsToSeasonOne = settings.LimitShowsToSeasonOne;
+
+        Plugin.Instance?.SaveConfiguration();
+
+        _logger.LogInformation("Updated Trakt settings for user {UserGuid}", userGuid);
+
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
+    /// DTO for user settings update.
+    /// </summary>
+    public class UserSettingsDto
+    {
+        /// <summary>
+        /// Gets or sets a value indicating whether to sync movie recommendations.
+        /// </summary>
+        public bool SyncMovieRecommendations { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to sync show recommendations.
+        /// </summary>
+        public bool SyncShowRecommendations { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to sync next seasons.
+        /// </summary>
+        public bool SyncNextSeasons { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to ignore collected items.
+        /// </summary>
+        public bool IgnoreCollected { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to ignore watchlisted items.
+        /// </summary>
+        public bool IgnoreWatchlisted { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to limit shows to season 1 only.
+        /// </summary>
+        public bool LimitShowsToSeasonOne { get; set; }
+    }
 }

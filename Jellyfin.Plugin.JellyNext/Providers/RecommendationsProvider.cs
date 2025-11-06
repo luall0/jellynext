@@ -41,7 +41,12 @@ public class RecommendationsProvider : IContentProvider
     public bool IsEnabledForUser(Guid userId)
     {
         var traktUser = UserHelper.GetTraktUser(userId);
-        return traktUser != null && !string.IsNullOrWhiteSpace(traktUser.AccessToken);
+        if (traktUser == null || string.IsNullOrWhiteSpace(traktUser.AccessToken))
+        {
+            return false;
+        }
+
+        return traktUser.SyncMovieRecommendations || traktUser.SyncShowRecommendations;
     }
 
     /// <inheritdoc />
@@ -54,82 +59,84 @@ public class RecommendationsProvider : IContentProvider
             return Array.Empty<ContentItem>();
         }
 
-        var config = Plugin.Instance?.Configuration;
-        if (config == null)
-        {
-            _logger.LogError("Plugin configuration not available");
-            return Array.Empty<ContentItem>();
-        }
-
         var contentItems = new List<ContentItem>();
 
         try
         {
-            // Fetch movie recommendations
-            var movies = await _traktApi.GetMovieRecommendations(
-                traktUser,
-                config.IgnoreCollected,
-                config.IgnoreWatchlisted,
-                limit: 50);
-
-            foreach (var movie in movies)
+            // Fetch movie recommendations if enabled for this user
+            if (traktUser.SyncMovieRecommendations)
             {
-                contentItems.Add(new ContentItem
+                var movies = await _traktApi.GetMovieRecommendations(
+                    traktUser,
+                    traktUser.IgnoreCollected,
+                    traktUser.IgnoreWatchlisted,
+                    limit: 50);
+
+                foreach (var movie in movies)
                 {
-                    Type = ContentType.Movie,
-                    Title = movie.Title,
-                    Year = movie.Year,
-                    TmdbId = movie.Ids.Tmdb,
-                    ImdbId = movie.Ids.Imdb,
-                    TraktId = movie.Ids.Trakt,
-                    ProviderName = ProviderName
-                });
+                    contentItems.Add(new ContentItem
+                    {
+                        Type = ContentType.Movie,
+                        Title = movie.Title,
+                        Year = movie.Year,
+                        TmdbId = movie.Ids.Tmdb,
+                        ImdbId = movie.Ids.Imdb,
+                        TraktId = movie.Ids.Trakt,
+                        ProviderName = ProviderName
+                    });
+                }
             }
 
-            // Fetch show recommendations
-            var shows = await _traktApi.GetShowRecommendations(
-                traktUser,
-                config.IgnoreCollected,
-                config.IgnoreWatchlisted,
-                limit: 50);
-
-            foreach (var show in shows)
+            // Fetch show recommendations if enabled for this user
+            TraktShow[] shows = Array.Empty<TraktShow>();
+            if (traktUser.SyncShowRecommendations)
             {
-                // Fetch season information to determine how many seasons have actually aired
-                int? airedSeasonCount = null;
-                try
-                {
-                    var seasons = await _traktApi.GetShowSeasons(traktUser, show.Ids.Trakt);
-                    // Count seasons that have aired episodes (excluding specials which are season 0)
-                    airedSeasonCount = seasons.Count(s => s.Number > 0 && s.AiredEpisodes > 0);
-                    _logger.LogDebug(
-                        "Show {Title} has {SeasonCount} aired seasons",
-                        show.Title,
-                        airedSeasonCount);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to fetch season info for show {Title}, will use default", show.Title);
-                }
+                shows = await _traktApi.GetShowRecommendations(
+                    traktUser,
+                    traktUser.IgnoreCollected,
+                    traktUser.IgnoreWatchlisted,
+                    limit: 50);
 
-                contentItems.Add(new ContentItem
+                foreach (var show in shows)
                 {
-                    Type = ContentType.Show,
-                    Title = show.Title,
-                    Year = show.Year,
-                    TmdbId = show.Ids.Tmdb,
-                    ImdbId = show.Ids.Imdb,
-                    TvdbId = show.Ids.Tvdb,
-                    TraktId = show.Ids.Trakt,
-                    ProviderName = ProviderName,
-                    AiredSeasonCount = airedSeasonCount
-                });
+                    // Fetch season information to determine how many seasons have actually aired
+                    int? airedSeasonCount = null;
+                    try
+                    {
+                        var seasons = await _traktApi.GetShowSeasons(traktUser, show.Ids.Trakt);
+                        // Count seasons that have aired episodes (excluding specials which are season 0)
+                        airedSeasonCount = seasons.Count(s => s.Number > 0 && s.AiredEpisodes > 0);
+                        _logger.LogDebug(
+                            "Show {Title} has {SeasonCount} aired seasons",
+                            show.Title,
+                            airedSeasonCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to fetch season info for show {Title}, will use default", show.Title);
+                    }
+
+                    contentItems.Add(new ContentItem
+                    {
+                        Type = ContentType.Show,
+                        Title = show.Title,
+                        Year = show.Year,
+                        TmdbId = show.Ids.Tmdb,
+                        ImdbId = show.Ids.Imdb,
+                        TvdbId = show.Ids.Tvdb,
+                        TraktId = show.Ids.Trakt,
+                        ProviderName = ProviderName,
+                        AiredSeasonCount = airedSeasonCount
+                    });
+                }
             }
 
+            int movieCount = contentItems.Count(c => c.Type == ContentType.Movie);
+            int showCount = contentItems.Count(c => c.Type == ContentType.Show);
             _logger.LogInformation(
                 "Fetched {MovieCount} movie and {ShowCount} show recommendations for user {UserId}",
-                movies.Length,
-                shows.Length,
+                movieCount,
+                showCount,
                 userId);
         }
         catch (Exception ex)

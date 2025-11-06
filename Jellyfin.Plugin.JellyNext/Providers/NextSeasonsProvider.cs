@@ -47,7 +47,12 @@ public class NextSeasonsProvider : IContentProvider
     public bool IsEnabledForUser(Guid userId)
     {
         var traktUser = UserHelper.GetTraktUser(userId);
-        return traktUser != null && !string.IsNullOrWhiteSpace(traktUser.AccessToken);
+        if (traktUser == null || string.IsNullOrWhiteSpace(traktUser.AccessToken))
+        {
+            return false;
+        }
+
+        return traktUser.SyncNextSeasons;
     }
 
     /// <inheritdoc />

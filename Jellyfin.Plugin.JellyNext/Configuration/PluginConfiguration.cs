@@ -65,21 +65,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public int CacheExpirationHours { get; set; } = 6;
 
     /// <summary>
-    /// Gets or sets a value indicating whether to ignore collected items in recommendations.
-    /// </summary>
-    public bool IgnoreCollected { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets a value indicating whether to ignore watchlisted items in recommendations.
-    /// </summary>
-    public bool IgnoreWatchlisted { get; set; } = false;
-
-    /// <summary>
-    /// Gets or sets a value indicating whether to limit show recommendations to season 1 only (improves Jellyfin scan performance).
-    /// </summary>
-    public bool LimitShowsToSeasonOne { get; set; } = true;
-
-    /// <summary>
     /// Gets or sets the array of per-user Trakt configurations.
     /// </summary>
     public TraktUser[] TraktUsers { get; set; } = Array.Empty<TraktUser>();

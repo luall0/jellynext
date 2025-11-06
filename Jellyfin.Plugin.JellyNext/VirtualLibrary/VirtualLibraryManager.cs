@@ -418,10 +418,10 @@ public class VirtualLibraryManager
                     {
                         // For regular shows: create per-season .strm files as fake episodes
                         // Format: S01E01 - Download Season 1.strm (Jellyfin treats these as episodes)
-                        var config = Plugin.Instance?.Configuration;
+                        var traktUser = Helpers.UserHelper.GetTraktUser(userId);
                         int maxSeason;
 
-                        if (config?.LimitShowsToSeasonOne == true)
+                        if (traktUser?.LimitShowsToSeasonOne == true)
                         {
                             // Only create stub for season 1
                             maxSeason = 1;
