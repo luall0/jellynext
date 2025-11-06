@@ -171,6 +171,15 @@
                                 Hide movies and shows in your Trakt watchlist from recommendations
                             </div>
                         </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="LimitShowsToSeasonOne" name="LimitShowsToSeasonOne" />
+                                <span>Limit Shows to Season 1 Only</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Only create stubs for Season 1 of show recommendations. When disabled, stubs are created for all aired seasons. (Recommended for better Jellyfin scan performance)
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Cache Settings -->
@@ -551,6 +560,7 @@
                     document.getElementById('SonarrApiKey').value = config.SonarrApiKey || '';
                     document.getElementById('IgnoreCollected').checked = config.IgnoreCollected !== false;
                     document.getElementById('IgnoreWatchlisted').checked = config.IgnoreWatchlisted === true;
+                    document.getElementById('LimitShowsToSeasonOne').checked = config.LimitShowsToSeasonOne === true;
                     document.getElementById('CacheExpirationHours').value = config.CacheExpirationHours || 6;
 
                     // If Radarr is configured, show a hint to test connection to see options
@@ -613,6 +623,7 @@
 
                     config.IgnoreCollected = document.getElementById('IgnoreCollected').checked;
                     config.IgnoreWatchlisted = document.getElementById('IgnoreWatchlisted').checked;
+                    config.LimitShowsToSeasonOne = document.getElementById('LimitShowsToSeasonOne').checked;
                     config.CacheExpirationHours = parseInt(document.getElementById('CacheExpirationHours').value);
 
                     ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {

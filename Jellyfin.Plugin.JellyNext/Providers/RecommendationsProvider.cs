@@ -95,6 +95,23 @@ public class RecommendationsProvider : IContentProvider
 
             foreach (var show in shows)
             {
+                // Fetch season information to determine how many seasons have actually aired
+                int? airedSeasonCount = null;
+                try
+                {
+                    var seasons = await _traktApi.GetShowSeasons(traktUser, show.Ids.Trakt);
+                    // Count seasons that have aired episodes (excluding specials which are season 0)
+                    airedSeasonCount = seasons.Count(s => s.Number > 0 && s.AiredEpisodes > 0);
+                    _logger.LogDebug(
+                        "Show {Title} has {SeasonCount} aired seasons",
+                        show.Title,
+                        airedSeasonCount);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to fetch season info for show {Title}, will use default", show.Title);
+                }
+
                 contentItems.Add(new ContentItem
                 {
                     Type = ContentType.Show,
@@ -104,7 +121,8 @@ public class RecommendationsProvider : IContentProvider
                     ImdbId = show.Ids.Imdb,
                     TvdbId = show.Ids.Tvdb,
                     TraktId = show.Ids.Trakt,
-                    ProviderName = ProviderName
+                    ProviderName = ProviderName,
+                    AiredSeasonCount = airedSeasonCount
                 });
             }
 

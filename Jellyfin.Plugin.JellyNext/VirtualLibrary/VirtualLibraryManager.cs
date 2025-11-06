@@ -416,10 +416,28 @@ public class VirtualLibraryManager
                     }
                     else
                     {
-                        // For regular shows: create per-season .strm files as fake episodes (seasons 1-10)
+                        // For regular shows: create per-season .strm files as fake episodes
                         // Format: S01E01 - Download Season 1.strm (Jellyfin treats these as episodes)
-                        // Users can trigger downloads for higher seasons manually
-                        for (int seasonNumber = 1; seasonNumber <= 10; seasonNumber++)
+                        var config = Plugin.Instance?.Configuration;
+                        int maxSeason;
+
+                        if (config?.LimitShowsToSeasonOne == true)
+                        {
+                            // Only create stub for season 1
+                            maxSeason = 1;
+                        }
+                        else if (item.AiredSeasonCount.HasValue && item.AiredSeasonCount.Value > 0)
+                        {
+                            // Use actual number of aired seasons
+                            maxSeason = item.AiredSeasonCount.Value;
+                        }
+                        else
+                        {
+                            // Fallback to 10 seasons if we don't have aired season info
+                            maxSeason = 10;
+                        }
+
+                        for (int seasonNumber = 1; seasonNumber <= maxSeason; seasonNumber++)
                         {
                             var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
                             var stubFile = Path.Combine(showFolder, seasonFileName);
@@ -435,7 +453,23 @@ public class VirtualLibraryManager
                             }
                         }
 
-                        _logger.LogDebug("Created show folder with per-season stubs: {Title} ({Year})", item.Title, year);
+                        // Clean up stub files for seasons beyond maxSeason
+                        var existingStubFiles = Directory.GetFiles(showFolder, $"S*{StubFileExtension}");
+                        foreach (var stubFile in existingStubFiles)
+                        {
+                            var fileName = Path.GetFileName(stubFile);
+                            var seasonMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"S(\d+)E\d+");
+                            if (seasonMatch.Success && int.TryParse(seasonMatch.Groups[1].Value, out var existingSeasonNum))
+                            {
+                                if (existingSeasonNum > maxSeason)
+                                {
+                                    File.Delete(stubFile);
+                                    _logger.LogDebug("Removed stub file for season {Season} (max is {MaxSeason}): {File}", existingSeasonNum, maxSeason, fileName);
+                                }
+                            }
+                        }
+
+                        _logger.LogDebug("Created show folder with per-season stubs (S1-S{MaxSeason}): {Title} ({Year})", maxSeason, item.Title, year);
                     }
                 }
             }

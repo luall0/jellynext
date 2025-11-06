@@ -56,4 +56,9 @@ public class ContentItem
     /// Gets or sets the season number (for next seasons provider).
     /// </summary>
     public int? SeasonNumber { get; set; }
+
+    /// <summary>
+    /// Gets or sets the number of seasons that have aired (for shows).
+    /// </summary>
+    public int? AiredSeasonCount { get; set; }
 }

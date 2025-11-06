@@ -30,12 +30,133 @@ Jellyfin plugin integrating Trakt-powered discovery with per-user virtual librar
 
 ## Architecture
 
+### Directory Structure
+```
+Jellyfin.Plugin.JellyNext/
+├── Api/                    # REST API Controllers (Trakt, Radarr, Sonarr, JellyNextLibrary)
+├── Configuration/          # Plugin settings (PluginConfiguration.cs, configPage.html)
+├── Helpers/                # Utilities (UserHelper.cs)
+├── Models/                 # Data models organized by service
+│   ├── Common/             # ContentItem, ContentType
+│   ├── Radarr/             # Movie, QualityProfile, RootFolder, etc.
+│   ├── Sonarr/             # Series, Season, QualityProfile, etc.
+│   └── Trakt/              # TraktUser, TraktMovie, TraktShow, TraktIds, etc.
+├── Providers/              # Content provider implementations (IContentProvider)
+├── Resolvers/              # Jellyfin item resolvers (JellyNextResolver.cs)
+├── Resources/              # Embedded resources (dummy.mp4)
+├── ScheduledTasks/         # Background tasks (ContentSyncScheduledTask.cs)
+├── Services/               # Business logic (TraktApi, ContentSync, Radarr/Sonarr, etc.)
+├── VirtualLibrary/         # Virtual library system (Manager, Creator, ContentType)
+├── Plugin.cs               # Main entry point
+└── PluginServiceRegistrator.cs  # DI registration
+```
+
 ### Key Components
 - **Content Providers** (`IContentProvider`): Modular sources (RecommendationsProvider, NextSeasonsProvider)
 - **Virtual Libraries**: Per-user .strm stub files (`jellynext-virtual/[userId]/[content-type]/`)
 - **Playback Interception**: Detects virtual item playback, triggers Radarr/Sonarr downloads
 - **OAuth**: Per-user Trakt tokens with auto-refresh (stored in `PluginConfiguration.TraktUsers[]`)
 - **Sync System**: `ContentSyncScheduledTask` + `StartupSyncService` → cache → .strm files → library scan
+
+### Architectural Layers
+```
+Plugin Entry → API Controllers → Services → Providers → Virtual Library → Jellyfin Core
+                                     ↓
+                              Playback Interceptor (triggers downloads)
+```
+
+**Layer Responsibilities**:
+- **Entry**: `Plugin.cs` (singleton), `PluginServiceRegistrator.cs` (DI)
+- **API**: REST endpoints for Trakt OAuth, Radarr/Sonarr operations, library queries
+- **Services**: External integrations (TraktApi, RadarrService, SonarrService), orchestration (ContentSyncService), caching (ContentCacheService), library queries (LocalLibraryService)
+- **Providers**: Pluggable content sources implementing `IContentProvider` (fetch recommendations, next seasons)
+- **Virtual Library**: Stub file management (VirtualLibraryManager), Jellyfin entity mapping (JellyNextResolver)
+- **Playback Interceptor**: Event listener triggering downloads on virtual item playback
+
+### File-by-File Responsibilities
+
+**Core Entry Points**:
+- `Plugin.cs`: Singleton instance, polling task tracking, configuration, web page registration
+- `PluginServiceRegistrator.cs`: All DI registrations (services, providers, resolvers, hosted services)
+
+**API Controllers** (`/Api/`):
+- `TraktController.cs`: OAuth device flow, token polling/refresh, user unlinking
+- `RadarrController.cs`: Connection test, profile/folder retrieval, movie downloads
+- `SonarrController.cs`: Connection test, profile/folder retrieval, TV show/season downloads
+- `JellyNextLibraryController.cs`: Query cached content (recommendations, next seasons)
+
+**Services** (`/Services/`):
+- `TraktApi.cs`: Trakt API client (OAuth, recommendations, watchlist, watched progress)
+- `ContentCacheService.cs`: In-memory cache (per-user, per-provider, 6hr expiration)
+- `ContentSyncService.cs`: Sync orchestrator (iterates users/providers, updates cache/virtual library)
+- `RadarrService.cs`: Radarr API client (movie search/add)
+- `SonarrService.cs`: Sonarr API client (series search/add, per-season monitoring, anime detection)
+- `LocalLibraryService.cs`: Jellyfin library queries (find series by TVDB ID, exclude virtual items)
+- `PlaybackInterceptor.cs`: IHostedService detecting virtual item playback, triggering downloads
+- `StartupSyncService.cs`: IHostedService triggering sync 5s after startup
+
+**Providers** (`/Providers/`):
+- `IContentProvider.cs`: Interface (ProviderName, LibraryName, FetchContentAsync, IsEnabledForUser)
+- `RecommendationsProvider.cs`: Fetches Trakt recommendations (movies + shows), creates stubs for 10 seasons per show
+- `NextSeasonsProvider.cs`: Fetches immediate next unwatched season, creates single stub per show
+
+**Virtual Library** (`/VirtualLibrary/`):
+- `VirtualLibraryManager.cs`: Stub file creation/management, dummy.mp4 extraction, .keep file maintenance
+- `VirtualLibraryCreator.cs`: Initialization wrapper
+- `VirtualLibraryContentType.cs`: Enum (MoviesRecommendations, ShowsRecommendations, etc.)
+- `VirtualLibraryContentTypeHelper.cs`: Maps content types to directories/providers/display names
+
+**Jellyfin Integration**:
+- `Resolvers/JellyNextResolver.cs`: IItemResolver mapping .strm files to Movie/Series entities (extracts IDs/metadata from filenames)
+- `ScheduledTasks/ContentSyncScheduledTask.cs`: IScheduledTask (6hr interval, calls ContentSyncService, triggers library scan)
+
+**Configuration**:
+- `Configuration/PluginConfiguration.cs`: Persisted settings (Radarr/Sonarr config, TraktUsers[], cache expiration)
+- `Configuration/configPage.html`: Embedded plugin UI
+- `Helpers/UserHelper.cs`: Retrieves per-user Trakt config from PluginConfiguration
+
+**Resources**:
+- `Resources/dummy.mp4`: FFprobe-compatible placeholder (2x2px, 1hr, ~2MB) for iOS/tvOS compatibility
+
+### Data Flow Examples
+
+**Content Sync**:
+```
+StartupSyncService (5s delay) → ITaskManager.QueueScheduledTask<ContentSyncScheduledTask>
+  → ContentSyncService.SyncAllAsync()
+    → For each user + provider:
+      IContentProvider.FetchContentAsync(userId)
+        → TraktApi (fetch recommendations/next seasons)
+        → LocalLibraryService (check existing library)
+      ContentCacheService.CacheContent()
+    → VirtualLibraryManager.RefreshVirtualLibrary() (create .strm stubs)
+    → ILibraryManager.ValidateMediaLibrary() (trigger Jellyfin scan)
+```
+
+**Download Trigger**:
+```
+User plays virtual item → PlaybackStart event
+  → PlaybackInterceptor.OnPlaybackStart()
+    → Extract userId/contentType/IDs from path regex
+    → ContentCacheService.GetCachedContent() (lookup metadata)
+    → If movie: RadarrService.AddMovieAsync()
+    → If show: SonarrService.AddSeriesAsync() (with season monitoring)
+
+User stops playback → PlaybackStopped event
+  → PlaybackInterceptor.OnPlaybackStopped()
+    → Clear playback state (prevent "watched" marking)
+```
+
+**OAuth Flow**:
+```
+User → TraktController.AuthorizeUser(userGuid)
+  → TraktApi.GetDeviceCodeAsync()
+  → Return device code + verification URL
+
+Background: Plugin.PollingTasks[userGuid] = TraktApi.PollForTokenAsync()
+  → Every 5s: TraktApi.GetAccessTokenAsync()
+  → On success: Save to PluginConfiguration.TraktUsers[]
+```
 
 ## Critical Patterns & Gotchas
 
