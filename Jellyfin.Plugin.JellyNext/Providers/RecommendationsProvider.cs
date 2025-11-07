@@ -69,110 +69,14 @@ public class RecommendationsProvider : IContentProvider
 
         try
         {
-            // Fetch movie recommendations if enabled for this user
             if (traktUser.SyncMovieRecommendations)
             {
-                var movies = await _traktApi.GetMovieRecommendations(
-                    traktUser,
-                    traktUser.IgnoreCollected,
-                    traktUser.IgnoreWatchlisted,
-                    limit: 50);
-
-                foreach (var movie in movies)
-                {
-                    contentItems.Add(new ContentItem
-                    {
-                        Type = ContentType.Movie,
-                        Title = movie.Title,
-                        Year = movie.Year,
-                        TmdbId = movie.Ids.Tmdb,
-                        ImdbId = movie.Ids.Imdb,
-                        TraktId = movie.Ids.Trakt,
-                        ProviderName = ProviderName,
-                        Genres = movie.Genres
-                    });
-                }
+                await FetchMovieRecommendationsAsync(traktUser, contentItems);
             }
 
-            // Fetch show recommendations if enabled for this user
-            TraktShow[] shows = Array.Empty<TraktShow>();
             if (traktUser.SyncShowRecommendations)
             {
-                shows = await _traktApi.GetShowRecommendations(
-                    traktUser,
-                    traktUser.IgnoreCollected,
-                    traktUser.IgnoreWatchlisted,
-                    limit: 50);
-
-                foreach (var show in shows)
-                {
-                    // Check if show is ended/canceled and in cache
-                    var isEnded = !string.IsNullOrEmpty(show.Status) &&
-                                  (show.Status.Equals("ended", StringComparison.OrdinalIgnoreCase) ||
-                                   show.Status.Equals("canceled", StringComparison.OrdinalIgnoreCase));
-
-                    int? airedSeasonCount = null;
-
-                    // If ended/canceled and in cache, use cached season count (skip API call)
-                    if (isEnded && show.Ids.Tvdb != null && show.Ids.Tvdb > 0)
-                    {
-                        var cachedMetadata = _endedShowsCache.GetEndedShow(show.Ids.Tvdb.Value);
-                        if (cachedMetadata != null)
-                        {
-                            airedSeasonCount = cachedMetadata.LastSeasonWatched;
-                            _logger.LogDebug(
-                                "Using cached season count for ended/canceled show: {Title} (TVDB: {TvdbId}, Seasons: {Seasons})",
-                                show.Title,
-                                show.Ids.Tvdb.Value,
-                                airedSeasonCount);
-                        }
-                    }
-
-                    // Only fetch season information if not in cache
-                    if (!airedSeasonCount.HasValue)
-                    {
-                        try
-                        {
-                            var seasons = await _traktApi.GetShowSeasons(traktUser, show.Ids.Trakt);
-                            // Count seasons that have aired episodes (excluding specials which are season 0)
-                            airedSeasonCount = seasons.Count(s => s.Number > 0 && s.AiredEpisodes > 0);
-                            _logger.LogDebug(
-                                "Show {Title} has {SeasonCount} aired seasons",
-                                show.Title,
-                                airedSeasonCount);
-
-                            // If show is ended/canceled and we fetched season info, cache it for future
-                            if (isEnded && show.Ids.Tvdb != null && show.Ids.Tvdb > 0 && airedSeasonCount.HasValue)
-                            {
-                                _endedShowsCache.MarkShowAsEnded(show, airedSeasonCount.Value);
-                                _logger.LogDebug(
-                                    "Cached ended/canceled show from recommendations: {Title} (TVDB: {TvdbId}, Status: {Status}, Seasons: {Seasons})",
-                                    show.Title,
-                                    show.Ids.Tvdb.Value,
-                                    show.Status,
-                                    airedSeasonCount.Value);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to fetch season info for show {Title}, will use default", show.Title);
-                        }
-                    }
-
-                    contentItems.Add(new ContentItem
-                    {
-                        Type = ContentType.Show,
-                        Title = show.Title,
-                        Year = show.Year,
-                        TmdbId = show.Ids.Tmdb,
-                        ImdbId = show.Ids.Imdb,
-                        TvdbId = show.Ids.Tvdb,
-                        TraktId = show.Ids.Trakt,
-                        ProviderName = ProviderName,
-                        AiredSeasonCount = airedSeasonCount,
-                        Genres = show.Genres
-                    });
-                }
+                await FetchShowRecommendationsAsync(traktUser, contentItems);
             }
 
             int movieCount = contentItems.Count(c => c.Type == ContentType.Movie);
@@ -189,5 +93,135 @@ public class RecommendationsProvider : IContentProvider
         }
 
         return contentItems.AsReadOnly();
+    }
+
+    private async Task FetchMovieRecommendationsAsync(TraktUser traktUser, List<ContentItem> contentItems)
+    {
+        var movies = await _traktApi.GetMovieRecommendations(
+            traktUser,
+            traktUser.IgnoreCollected,
+            traktUser.IgnoreWatchlisted,
+            limit: 50);
+
+        foreach (var movie in movies)
+        {
+            contentItems.Add(new ContentItem
+            {
+                Type = ContentType.Movie,
+                Title = movie.Title,
+                Year = movie.Year,
+                TmdbId = movie.Ids.Tmdb,
+                ImdbId = movie.Ids.Imdb,
+                TraktId = movie.Ids.Trakt,
+                ProviderName = ProviderName,
+                Genres = movie.Genres
+            });
+        }
+    }
+
+    private async Task FetchShowRecommendationsAsync(TraktUser traktUser, List<ContentItem> contentItems)
+    {
+        var shows = await _traktApi.GetShowRecommendations(
+            traktUser,
+            traktUser.IgnoreCollected,
+            traktUser.IgnoreWatchlisted,
+            limit: 50);
+
+        foreach (var show in shows)
+        {
+            var contentItem = await ProcessShowRecommendationAsync(show, traktUser);
+            contentItems.Add(contentItem);
+        }
+    }
+
+    private async Task<ContentItem> ProcessShowRecommendationAsync(TraktShow show, TraktUser traktUser)
+    {
+        var isEnded = IsShowEnded(show);
+        var airedSeasonCount = await GetAiredSeasonCountAsync(show, traktUser, isEnded);
+
+        return new ContentItem
+        {
+            Type = ContentType.Show,
+            Title = show.Title,
+            Year = show.Year,
+            TmdbId = show.Ids.Tmdb,
+            ImdbId = show.Ids.Imdb,
+            TvdbId = show.Ids.Tvdb,
+            TraktId = show.Ids.Trakt,
+            ProviderName = ProviderName,
+            AiredSeasonCount = airedSeasonCount,
+            Genres = show.Genres
+        };
+    }
+
+    private bool IsShowEnded(TraktShow show)
+    {
+        return !string.IsNullOrEmpty(show.Status) &&
+               (show.Status.Equals("ended", StringComparison.OrdinalIgnoreCase) ||
+                show.Status.Equals("canceled", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task<int?> GetAiredSeasonCountAsync(TraktShow show, TraktUser traktUser, bool isEnded)
+    {
+        var cachedSeasonCount = TryGetCachedSeasonCount(show, isEnded);
+        if (cachedSeasonCount.HasValue)
+        {
+            return cachedSeasonCount.Value;
+        }
+
+        return await FetchAndCacheSeasonCountAsync(show, traktUser, isEnded);
+    }
+
+    private int? TryGetCachedSeasonCount(TraktShow show, bool isEnded)
+    {
+        if (!isEnded || show.Ids.Tvdb == null || show.Ids.Tvdb <= 0)
+        {
+            return null;
+        }
+
+        var cachedMetadata = _endedShowsCache.GetEndedShow(show.Ids.Tvdb.Value);
+        if (cachedMetadata != null)
+        {
+            _logger.LogDebug(
+                "Using cached season count for ended/canceled show: {Title} (TVDB: {TvdbId}, Seasons: {Seasons})",
+                show.Title,
+                show.Ids.Tvdb.Value,
+                cachedMetadata.LastSeasonWatched);
+            return cachedMetadata.LastSeasonWatched;
+        }
+
+        return null;
+    }
+
+    private async Task<int?> FetchAndCacheSeasonCountAsync(TraktShow show, TraktUser traktUser, bool isEnded)
+    {
+        try
+        {
+            var seasons = await _traktApi.GetShowSeasons(traktUser, show.Ids.Trakt);
+            var airedSeasonCount = seasons.Count(s => s.Number > 0 && s.AiredEpisodes > 0);
+
+            _logger.LogDebug(
+                "Show {Title} has {SeasonCount} aired seasons",
+                show.Title,
+                airedSeasonCount);
+
+            if (isEnded && show.Ids.Tvdb != null && show.Ids.Tvdb > 0)
+            {
+                _endedShowsCache.MarkShowAsEnded(show, airedSeasonCount);
+                _logger.LogDebug(
+                    "Cached ended/canceled show from recommendations: {Title} (TVDB: {TvdbId}, Status: {Status}, Seasons: {Seasons})",
+                    show.Title,
+                    show.Ids.Tvdb.Value,
+                    show.Status,
+                    airedSeasonCount);
+            }
+
+            return airedSeasonCount;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch season info for show {Title}, will use default", show.Title);
+            return null;
+        }
     }
 }
