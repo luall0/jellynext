@@ -550,6 +550,33 @@ public class VirtualLibraryManager
     }
 
     /// <summary>
+    /// Initializes directories for a new user immediately.
+    /// </summary>
+    /// <param name="userId">The user ID.</param>
+    public void InitializeUserDirectories(Guid userId)
+    {
+        if (string.IsNullOrEmpty(_virtualLibraryPath))
+        {
+            _logger.LogWarning("Virtual library path not initialized, cannot create user directories");
+            return;
+        }
+
+        try
+        {
+            // Create all content type directories for the user
+            EnsureDirectoryExists(GetUserLibraryPath(userId, VirtualLibraryContentType.MoviesRecommendations));
+            EnsureDirectoryExists(GetUserLibraryPath(userId, VirtualLibraryContentType.ShowsRecommendations));
+            EnsureDirectoryExists(GetUserLibraryPath(userId, VirtualLibraryContentType.ShowsNextSeasons));
+
+            _logger.LogInformation("Initialized virtual library directories for user {UserId}", userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error initializing directories for user {UserId}", userId);
+        }
+    }
+
+    /// <summary>
     /// Gets setup instructions for all users.
     /// </summary>
     /// <returns>Dictionary mapping user IDs to library paths and instructions.</returns>

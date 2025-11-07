@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.JellyNext.Helpers;
 using Jellyfin.Plugin.JellyNext.Services;
+using Jellyfin.Plugin.JellyNext.VirtualLibrary;
 using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -21,16 +22,22 @@ public class TraktController : ControllerBase
 {
     private readonly ILogger<TraktController> _logger;
     private readonly TraktApi _traktApi;
+    private readonly VirtualLibraryManager _virtualLibraryManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TraktController"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="traktApi">The Trakt API service.</param>
-    public TraktController(ILogger<TraktController> logger, TraktApi traktApi)
+    /// <param name="virtualLibraryManager">The virtual library manager.</param>
+    public TraktController(
+        ILogger<TraktController> logger,
+        TraktApi traktApi,
+        VirtualLibraryManager virtualLibraryManager)
     {
         _logger = logger;
         _traktApi = traktApi;
+        _virtualLibraryManager = virtualLibraryManager;
     }
 
     /// <summary>
@@ -47,11 +54,16 @@ public class TraktController : ControllerBase
         try
         {
             var traktUser = UserHelper.GetTraktUser(userGuid);
-            if (traktUser == null)
+            var isNewUser = traktUser == null;
+
+            if (isNewUser)
             {
                 Plugin.Instance?.Configuration.AddUser(userGuid);
                 Plugin.Instance?.SaveConfiguration();
                 traktUser = UserHelper.GetTraktUser(userGuid);
+
+                // Initialize virtual library directories immediately for new user
+                _virtualLibraryManager.InitializeUserDirectories(userGuid);
             }
 
             if (traktUser == null)
