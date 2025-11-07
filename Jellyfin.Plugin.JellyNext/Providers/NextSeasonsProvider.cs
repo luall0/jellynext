@@ -114,6 +114,7 @@ public class NextSeasonsProvider : IContentProvider
                     }
 
                     var highestWatchedSeason = watchedSeasons.First();
+                    var nextSeasonNumber = highestWatchedSeason + 1;
 
                     // Check if show is marked as ended or canceled
                     var isEnded = !string.IsNullOrEmpty(watchedShow.Show.Status) &&
@@ -126,18 +127,43 @@ public class NextSeasonsProvider : IContentProvider
                         var cachedMetadata = _endedShowsCache.GetEndedShow(tvdbId);
                         if (cachedMetadata != null)
                         {
-                            // Update last watched season if this user has progressed further
-                            if (highestWatchedSeason > cachedMetadata.LastSeasonWatched)
+                            // If user hasn't progressed beyond cached season, skip (no new season to check)
+                            if (highestWatchedSeason <= cachedMetadata.LastSeasonWatched)
                             {
-                                _endedShowsCache.MarkShowAsEnded(watchedShow.Show, highestWatchedSeason);
-                            }
+                                // Check if the next season exists locally (could have been added manually)
+                                var existsLocally = _localLibraryService.DoesSeasonExist(tvdbId, nextSeasonNumber);
 
-                            _logger.LogDebug(
-                                "Skipping ended/canceled show from cache: {Title} (TVDB: {TvdbId}, Status: {Status})",
-                                watchedShow.Show.Title,
-                                tvdbId,
-                                cachedMetadata.Status);
-                            continue;
+                                if (!existsLocally)
+                                {
+                                    // No progress and next season not in library - safe to skip
+                                    _logger.LogDebug(
+                                        "Skipping ended/canceled show from cache: {Title} (TVDB: {TvdbId}, Status: {Status}, Last watched: S{Season})",
+                                        watchedShow.Show.Title,
+                                        tvdbId,
+                                        cachedMetadata.Status,
+                                        highestWatchedSeason);
+                                    continue;
+                                }
+                                else
+                                {
+                                    // Next season exists locally - user may have progressed, need to check for new seasons
+                                    _logger.LogInformation(
+                                        "Next season S{Season} found locally for cached show {Title} (TVDB: {TvdbId}), checking for newer seasons",
+                                        nextSeasonNumber,
+                                        watchedShow.Show.Title,
+                                        tvdbId);
+                                }
+                            }
+                            else
+                            {
+                                // User progressed beyond cached season - update cache and check for new seasons
+                                _logger.LogInformation(
+                                    "User progressed beyond cached season for {Title} (TVDB: {TvdbId}): S{Old} -> S{New}, re-checking seasons",
+                                    watchedShow.Show.Title,
+                                    tvdbId,
+                                    cachedMetadata.LastSeasonWatched,
+                                    highestWatchedSeason);
+                            }
                         }
                     }
 
@@ -169,8 +195,6 @@ public class NextSeasonsProvider : IContentProvider
                         .Select(s => s.Number)
                         .ToHashSet();
 
-                    var nextSeasonNumber = highestWatchedSeason + 1;
-
                     // Check if this next season has been released (exists in Trakt)
                     if (!availableSeasonNumbers.Contains(nextSeasonNumber))
                     {
@@ -189,9 +213,9 @@ public class NextSeasonsProvider : IContentProvider
                     }
 
                     // Check if this next season exists locally
-                    var existsLocally = _localLibraryService.DoesSeasonExist(tvdbId, nextSeasonNumber);
+                    var seasonExistsLocally = _localLibraryService.DoesSeasonExist(tvdbId, nextSeasonNumber);
 
-                    if (!existsLocally)
+                    if (!seasonExistsLocally)
                     {
                         contentItems.Add(new ContentItem
                         {

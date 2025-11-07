@@ -195,13 +195,14 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 - Filters: aired episodes > 0, not in local library (via TVDB ID matching)
 - Creates ONE stub per show (not seasons 1-10 like recommendations)
 - Uses ended shows cache to skip re-querying completed shows
+- **Cache invalidation**: Re-checks Trakt if user progresses beyond cached season OR next season appears in local library
 
 ### Ended Shows Cache
 - **Purpose**: Reduce API calls for shows with status "ended" or "canceled" (won't get new seasons)
 - **Shared cache**: Both RecommendationsProvider and NextSeasonsProvider use same cache instance
 - **Expiration**: Configurable via `EndedShowsCacheExpirationDays` (default: 7 days, range: 1-365)
 - **Cleanup**: Automatic during each ContentSync, removes expired entries
-- **Behavior**: Cache season count on first fetch, reuse on subsequent syncs (skips GetShowSeasons API call)
+- **Smart caching**: Skips API call only if user hasn't progressed AND next season not in library (allows discovery of renewed shows)
 
 ### Jellyfin 10.11 API Changes
 - **UserDataManager**: Requires `User` entity (not `Guid`) - inject `IUserManager`, use `GetUserById(Guid)`
