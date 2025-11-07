@@ -92,7 +92,6 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `SonarrService.cs`: Sonarr API client (series search/add, per-season monitoring, anime detection)
 - `LocalLibraryService.cs`: Jellyfin library queries (find series by TVDB ID, exclude virtual items)
 - `PlaybackInterceptor.cs`: IHostedService detecting virtual item playback, triggering downloads
-- `StartupSyncService.cs`: IHostedService triggering sync 5s after startup
 
 **Providers** (`/Providers/`):
 - `IContentProvider.cs`: Interface (ProviderName, LibraryName, FetchContentAsync, IsEnabledForUser)

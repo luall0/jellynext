@@ -68,9 +68,6 @@ public class VirtualLibraryManager
 
             // Log setup instructions for each user
             LogSetupInstructions();
-
-            // Create stub files for current recommendations
-            RefreshStubFiles();
         }
         catch (Exception ex)
         {
@@ -278,33 +275,15 @@ public class VirtualLibraryManager
         try
         {
             var userPath = GetUserLibraryPath(userId, contentType);
-
-            // Ensure directory exists
-            if (!Directory.Exists(userPath))
-            {
-                Directory.CreateDirectory(userPath);
-                _logger.LogInformation("Created directory: {Path}", userPath);
-            }
-
-            // Create/maintain .keep file to prevent Jellyfin from ignoring empty directories
-            var keepFile = Path.Combine(userPath, KeepFileName);
-            if (!File.Exists(keepFile))
-            {
-                File.WriteAllText(keepFile, "This file ensures Jellyfin recognizes this directory even when empty.");
-                _logger.LogDebug("Created .keep file: {Path}", keepFile);
-            }
+            EnsureDirectoryExists(userPath);
 
             var providerName = VirtualLibraryContentTypeHelper.GetProviderName(contentType);
             var cachedContent = _cacheService.GetCachedContent(userId, providerName);
 
-            // Determine media type from content type
             var mediaType = VirtualLibraryContentTypeHelper.GetMediaType(contentType);
             var isMovies = mediaType == "Movies";
 
-            // Filter content based on media type
-            var items = isMovies
-                ? cachedContent.Where(c => c.Type == ContentType.Movie && c.TmdbId.HasValue).ToList()
-                : cachedContent.Where(c => c.Type == ContentType.Show && c.TvdbId.HasValue).ToList();
+            var items = FilterContentByMediaType(cachedContent, isMovies);
 
             _logger.LogInformation(
                 "Refreshing {Count} {MediaType} recommendations for user {UserId}",
@@ -314,170 +293,234 @@ public class VirtualLibraryManager
 
             if (isMovies)
             {
-                // For movies: flat .strm files in root directory
-                var existingFiles = Directory.GetFiles(userPath, $"*{StubFileExtension}");
-                var currentTmdbIds = items.Select(m => m.TmdbId!.Value).ToHashSet();
-
-                // Clean old stub files
-                foreach (var file in existingFiles)
-                {
-                    var fileName = Path.GetFileNameWithoutExtension(file);
-                    var tmdbMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"\[tmdbid-(\d+)\]$");
-                    if (tmdbMatch.Success && int.TryParse(tmdbMatch.Groups[1].Value, out var tmdbId))
-                    {
-                        if (!currentTmdbIds.Contains(tmdbId))
-                        {
-                            File.Delete(file);
-                            _logger.LogDebug("Removed old stub file: {File}", file);
-                        }
-                    }
-                }
-
-                // Create new stub files
-                foreach (var item in items)
-                {
-                    var title = SanitizeFilename(item.Title);
-                    var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
-                    var tmdbId = item.TmdbId!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    var fileName = $"{title} ({year}) [tmdbid-{tmdbId}]{StubFileExtension}";
-                    var stubFile = Path.Combine(userPath, fileName);
-
-                    if (!File.Exists(stubFile))
-                    {
-                        // Point to dummy video file for FFprobe compatibility
-                        // Playback interceptor detects virtual items by path, not file content
-                        var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
-                            ? _dummyVideoPath
-                            : "http://jellynext-placeholder/movie"; // Fallback if dummy video creation failed
-                        File.WriteAllText(stubFile, content);
-                        _logger.LogDebug("Created stub file: {Title} ({Year})", item.Title, year);
-                    }
-                }
+                RefreshMovieStubFiles(userPath, items);
             }
             else
             {
-                // For shows: create folder structure with per-season .strm files
-                var existingDirs = Directory.GetDirectories(userPath);
-                var currentTvdbIds = items.Select(s => s.TvdbId!.Value).ToHashSet();
-
-                // Clean old show folders
-                foreach (var dir in existingDirs)
-                {
-                    var dirName = Path.GetFileName(dir);
-                    var tvdbMatch = System.Text.RegularExpressions.Regex.Match(dirName, @"\[tvdbid-(\d+)\]$");
-                    if (tvdbMatch.Success && int.TryParse(tvdbMatch.Groups[1].Value, out var tvdbId))
-                    {
-                        if (!currentTvdbIds.Contains(tvdbId))
-                        {
-                            Directory.Delete(dir, recursive: true);
-                            _logger.LogDebug("Removed old show folder: {Dir}", dir);
-                        }
-                    }
-                }
-
-                // Determine if this is next seasons content (one stub per show for specific season)
-                // or regular show content (multiple stubs for seasons 1-10)
-                var isNextSeasons = contentType == VirtualLibraryContentType.ShowsNextSeasons;
-
-                // Create new show folders with per-season .strm files
-                foreach (var item in items)
-                {
-                    var title = SanitizeFilename(item.Title);
-                    var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
-                    var tvdbId = item.TvdbId!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    var showFolderName = $"{title} ({year}) [tvdbid-{tvdbId}]";
-                    var showFolder = Path.Combine(userPath, showFolderName);
-
-                    if (!Directory.Exists(showFolder))
-                    {
-                        Directory.CreateDirectory(showFolder);
-                    }
-
-                    if (isNextSeasons && item.SeasonNumber.HasValue)
-                    {
-                        // For next seasons: create only ONE stub file for the specific season
-                        var seasonNumber = item.SeasonNumber.Value;
-                        var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
-                        var stubFile = Path.Combine(showFolder, seasonFileName);
-
-                        if (!File.Exists(stubFile))
-                        {
-                            var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
-                                ? _dummyVideoPath
-                                : "http://jellynext-placeholder/show";
-                            File.WriteAllText(stubFile, content);
-                        }
-
-                        _logger.LogDebug(
-                            "Created next season stub: {Title} ({Year}) - Season {Season}",
-                            item.Title,
-                            year,
-                            seasonNumber);
-                    }
-                    else
-                    {
-                        // For regular shows: create per-season .strm files as fake episodes
-                        // Format: S01E01 - Download Season 1.strm (Jellyfin treats these as episodes)
-                        var traktUser = Helpers.UserHelper.GetTraktUser(userId);
-                        int maxSeason;
-
-                        if (traktUser?.LimitShowsToSeasonOne == true)
-                        {
-                            // Only create stub for season 1
-                            maxSeason = 1;
-                        }
-                        else if (item.AiredSeasonCount.HasValue && item.AiredSeasonCount.Value > 0)
-                        {
-                            // Use actual number of aired seasons
-                            maxSeason = item.AiredSeasonCount.Value;
-                        }
-                        else
-                        {
-                            // Fallback to 10 seasons if we don't have aired season info
-                            maxSeason = 10;
-                        }
-
-                        for (int seasonNumber = 1; seasonNumber <= maxSeason; seasonNumber++)
-                        {
-                            var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
-                            var stubFile = Path.Combine(showFolder, seasonFileName);
-
-                            if (!File.Exists(stubFile))
-                            {
-                                // Point to dummy video file for FFprobe compatibility
-                                // Playback interceptor will extract season number from filename pattern S##E##
-                                var content = !string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath)
-                                    ? _dummyVideoPath
-                                    : "http://jellynext-placeholder/show"; // Fallback if dummy video creation failed
-                                File.WriteAllText(stubFile, content);
-                            }
-                        }
-
-                        // Clean up stub files for seasons beyond maxSeason
-                        var existingStubFiles = Directory.GetFiles(showFolder, $"S*{StubFileExtension}");
-                        foreach (var stubFile in existingStubFiles)
-                        {
-                            var fileName = Path.GetFileName(stubFile);
-                            var seasonMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"S(\d+)E\d+");
-                            if (seasonMatch.Success && int.TryParse(seasonMatch.Groups[1].Value, out var existingSeasonNum))
-                            {
-                                if (existingSeasonNum > maxSeason)
-                                {
-                                    File.Delete(stubFile);
-                                    _logger.LogDebug("Removed stub file for season {Season} (max is {MaxSeason}): {File}", existingSeasonNum, maxSeason, fileName);
-                                }
-                            }
-                        }
-
-                        _logger.LogDebug("Created show folder with per-season stubs (S1-S{MaxSeason}): {Title} ({Year})", maxSeason, item.Title, year);
-                    }
-                }
+                RefreshShowStubFiles(userPath, items, contentType, userId);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error refreshing stub files for user {UserId}", userId);
         }
+    }
+
+    private void EnsureDirectoryExists(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            Directory.CreateDirectory(path);
+            _logger.LogInformation("Created directory: {Path}", path);
+        }
+
+        var keepFile = Path.Combine(path, KeepFileName);
+        if (!File.Exists(keepFile))
+        {
+            File.WriteAllText(keepFile, "This file ensures Jellyfin recognizes this directory even when empty.");
+            _logger.LogDebug("Created .keep file: {Path}", keepFile);
+        }
+    }
+
+    private static List<ContentItem> FilterContentByMediaType(IReadOnlyList<ContentItem> content, bool isMovies)
+    {
+        return isMovies
+            ? content.Where(c => c.Type == ContentType.Movie && c.TmdbId.HasValue).ToList()
+            : content.Where(c => c.Type == ContentType.Show && c.TvdbId.HasValue).ToList();
+    }
+
+    private void RefreshMovieStubFiles(string userPath, List<ContentItem> items)
+    {
+        var existingFiles = Directory.GetFiles(userPath, $"*{StubFileExtension}");
+        var currentTmdbIds = items.Select(m => m.TmdbId!.Value).ToHashSet();
+
+        CleanOldMovieStubFiles(existingFiles, currentTmdbIds);
+        CreateMovieStubFiles(userPath, items);
+    }
+
+    private void CleanOldMovieStubFiles(string[] existingFiles, HashSet<int> currentTmdbIds)
+    {
+        foreach (var file in existingFiles)
+        {
+            var fileName = Path.GetFileNameWithoutExtension(file);
+            var tmdbMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"\[tmdbid-(\d+)\]$");
+            if (tmdbMatch.Success && int.TryParse(tmdbMatch.Groups[1].Value, out var tmdbId))
+            {
+                if (!currentTmdbIds.Contains(tmdbId))
+                {
+                    File.Delete(file);
+                    _logger.LogDebug("Removed old stub file: {File}", file);
+                }
+            }
+        }
+    }
+
+    private void CreateMovieStubFiles(string userPath, List<ContentItem> items)
+    {
+        foreach (var item in items)
+        {
+            var title = SanitizeFilename(item.Title);
+            var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
+            var tmdbId = item.TmdbId!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var fileName = $"{title} ({year}) [tmdbid-{tmdbId}]{StubFileExtension}";
+            var stubFile = Path.Combine(userPath, fileName);
+
+            if (!File.Exists(stubFile))
+            {
+                var content = GetStubFileContent("movie");
+                File.WriteAllText(stubFile, content);
+                _logger.LogDebug("Created stub file: {Title} ({Year})", item.Title, year);
+            }
+        }
+    }
+
+    private void RefreshShowStubFiles(string userPath, List<ContentItem> items, VirtualLibraryContentType contentType, Guid userId)
+    {
+        var existingDirs = Directory.GetDirectories(userPath);
+        var currentTvdbIds = items.Select(s => s.TvdbId!.Value).ToHashSet();
+
+        CleanOldShowFolders(existingDirs, currentTvdbIds);
+
+        var isNextSeasons = contentType == VirtualLibraryContentType.ShowsNextSeasons;
+
+        foreach (var item in items)
+        {
+            var showFolder = CreateShowFolder(userPath, item);
+
+            if (isNextSeasons && item.SeasonNumber.HasValue)
+            {
+                CreateNextSeasonStub(showFolder, item);
+            }
+            else
+            {
+                CreateRegularShowStubs(showFolder, item, userId);
+            }
+        }
+    }
+
+    private void CleanOldShowFolders(string[] existingDirs, HashSet<int> currentTvdbIds)
+    {
+        foreach (var dir in existingDirs)
+        {
+            var dirName = Path.GetFileName(dir);
+            var tvdbMatch = System.Text.RegularExpressions.Regex.Match(dirName, @"\[tvdbid-(\d+)\]$");
+            if (tvdbMatch.Success && int.TryParse(tvdbMatch.Groups[1].Value, out var tvdbId))
+            {
+                if (!currentTvdbIds.Contains(tvdbId))
+                {
+                    Directory.Delete(dir, recursive: true);
+                    _logger.LogDebug("Removed old show folder: {Dir}", dir);
+                }
+            }
+        }
+    }
+
+    private string CreateShowFolder(string userPath, ContentItem item)
+    {
+        var title = SanitizeFilename(item.Title);
+        var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
+        var tvdbId = item.TvdbId!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var showFolderName = $"{title} ({year}) [tvdbid-{tvdbId}]";
+        var showFolder = Path.Combine(userPath, showFolderName);
+
+        if (!Directory.Exists(showFolder))
+        {
+            Directory.CreateDirectory(showFolder);
+        }
+
+        return showFolder;
+    }
+
+    private void CreateNextSeasonStub(string showFolder, ContentItem item)
+    {
+        var seasonNumber = item.SeasonNumber!.Value;
+        var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
+        var stubFile = Path.Combine(showFolder, seasonFileName);
+
+        if (!File.Exists(stubFile))
+        {
+            var content = GetStubFileContent("show");
+            File.WriteAllText(stubFile, content);
+        }
+
+        var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
+        _logger.LogDebug(
+            "Created next season stub: {Title} ({Year}) - Season {Season}",
+            item.Title,
+            year,
+            seasonNumber);
+    }
+
+    private void CreateRegularShowStubs(string showFolder, ContentItem item, Guid userId)
+    {
+        var maxSeason = DetermineMaxSeason(item, userId);
+
+        for (int seasonNumber = 1; seasonNumber <= maxSeason; seasonNumber++)
+        {
+            CreateSeasonStubFile(showFolder, seasonNumber);
+        }
+
+        CleanupExcessSeasonStubs(showFolder, maxSeason);
+
+        var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
+        _logger.LogDebug("Created show folder with per-season stubs (S1-S{MaxSeason}): {Title} ({Year})", maxSeason, item.Title, year);
+    }
+
+    private int DetermineMaxSeason(ContentItem item, Guid userId)
+    {
+        var traktUser = Helpers.UserHelper.GetTraktUser(userId);
+
+        if (traktUser?.LimitShowsToSeasonOne == true)
+        {
+            return 1;
+        }
+
+        if (item.AiredSeasonCount.HasValue && item.AiredSeasonCount.Value > 0)
+        {
+            return item.AiredSeasonCount.Value;
+        }
+
+        return 10;
+    }
+
+    private void CreateSeasonStubFile(string showFolder, int seasonNumber)
+    {
+        var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
+        var stubFile = Path.Combine(showFolder, seasonFileName);
+
+        if (!File.Exists(stubFile))
+        {
+            var content = GetStubFileContent("show");
+            File.WriteAllText(stubFile, content);
+        }
+    }
+
+    private void CleanupExcessSeasonStubs(string showFolder, int maxSeason)
+    {
+        var existingStubFiles = Directory.GetFiles(showFolder, $"S*{StubFileExtension}");
+        foreach (var stubFile in existingStubFiles)
+        {
+            var fileName = Path.GetFileName(stubFile);
+            var seasonMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"S(\d+)E\d+");
+            if (seasonMatch.Success && int.TryParse(seasonMatch.Groups[1].Value, out var existingSeasonNum))
+            {
+                if (existingSeasonNum > maxSeason)
+                {
+                    File.Delete(stubFile);
+                    _logger.LogDebug("Removed stub file for season {Season} (max is {MaxSeason}): {File}", existingSeasonNum, maxSeason, fileName);
+                }
+            }
+        }
+    }
+
+    private string GetStubFileContent(string placeholderType)
+    {
+        if (!string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath))
+        {
+            return _dummyVideoPath;
+        }
+
+        return $"http://jellynext-placeholder/{placeholderType}";
     }
 
     /// <summary>
