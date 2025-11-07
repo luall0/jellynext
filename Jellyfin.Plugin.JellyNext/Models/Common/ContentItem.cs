@@ -61,4 +61,9 @@ public class ContentItem
     /// Gets or sets the number of seasons that have aired (for shows).
     /// </summary>
     public int? AiredSeasonCount { get; set; }
+
+    /// <summary>
+    /// Gets or sets the genres.
+    /// </summary>
+    public string[] Genres { get; set; } = Array.Empty<string>();
 }

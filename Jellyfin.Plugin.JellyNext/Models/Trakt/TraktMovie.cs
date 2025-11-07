@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json.Serialization;
 
 namespace Jellyfin.Plugin.JellyNext.Models.Trakt;
@@ -24,4 +25,10 @@ public class TraktMovie
     /// </summary>
     [JsonPropertyName("ids")]
     public TraktIds Ids { get; set; } = new TraktIds();
+
+    /// <summary>
+    /// Gets or sets the genres.
+    /// </summary>
+    [JsonPropertyName("genres")]
+    public string[] Genres { get; set; } = Array.Empty<string>();
 }

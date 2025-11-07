@@ -82,7 +82,8 @@ public class RecommendationsProvider : IContentProvider
                         TmdbId = movie.Ids.Tmdb,
                         ImdbId = movie.Ids.Imdb,
                         TraktId = movie.Ids.Trakt,
-                        ProviderName = ProviderName
+                        ProviderName = ProviderName,
+                        Genres = movie.Genres
                     });
                 }
             }
@@ -126,7 +127,8 @@ public class RecommendationsProvider : IContentProvider
                         TvdbId = show.Ids.Tvdb,
                         TraktId = show.Ids.Trakt,
                         ProviderName = ProviderName,
-                        AiredSeasonCount = airedSeasonCount
+                        AiredSeasonCount = airedSeasonCount,
+                        Genres = show.Genres
                     });
                 }
             }

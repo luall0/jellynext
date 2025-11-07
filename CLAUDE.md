@@ -163,6 +163,9 @@ Background: Plugin.PollingTasks[userGuid] = TraktApi.PollForTokenAsync()
 ### Trakt API Headers
 **Only two headers**: `trakt-api-version: 2` and `trakt-api-key: {client_id}` - do NOT add User-Agent/Accept (causes issues)
 
+### Trakt Extended Metadata
+**Use `extended=full`**: Required to retrieve genre data for anime detection - add to recommendations and watched shows endpoints
+
 ### Per-User Architecture
 - Each user has own Trakt OAuth token (stored in `PluginConfiguration.TraktUsers[]`)
 - Per-user sync settings: `SyncMovieRecommendations`, `SyncShowRecommendations`, `SyncNextSeasons`, `IgnoreCollected`, `IgnoreWatchlisted`, `LimitShowsToSeasonOne` (all in `TraktUser` model)
@@ -183,7 +186,7 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 
 ### TV Show Downloads
 - **Per-season monitoring**: Series `Monitored=true`, but only specific season has `Monitored=true` in seasons array
-- **Anime detection**: Title heuristics determine `SonarrAnimeRootFolderPath` vs `SonarrRootFolderPath`
+- **Anime detection**: Uses Trakt genre metadata (`ContentItem.Genres` contains "anime") to route to `SonarrAnimeRootFolderPath` vs `SonarrRootFolderPath`
 - **"Next Up" prevention**: Clear playback state in `PlaybackStopped` event (not `PlaybackStart`)
 
 ### Next Seasons Discovery

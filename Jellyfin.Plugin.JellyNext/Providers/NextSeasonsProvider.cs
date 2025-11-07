@@ -161,7 +161,8 @@ public class NextSeasonsProvider : IContentProvider
                             TvdbId = watchedShow.Show.Ids.Tvdb,
                             TraktId = watchedShow.Show.Ids.Trakt,
                             ProviderName = ProviderName,
-                            SeasonNumber = nextSeasonNumber
+                            SeasonNumber = nextSeasonNumber,
+                            Genres = watchedShow.Show.Genres
                         });
                     }
                 }

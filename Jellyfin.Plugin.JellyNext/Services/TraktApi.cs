@@ -261,7 +261,7 @@ public class TraktApi
         bool ignoreWatchlisted = false,
         int limit = 10)
     {
-        var queryParams = $"?limit={limit}";
+        var queryParams = $"?limit={limit}&extended=full";
         if (ignoreCollected)
         {
             queryParams += "&ignore_collected=true";
@@ -303,7 +303,7 @@ public class TraktApi
         bool ignoreWatchlisted = false,
         int limit = 10)
     {
-        var queryParams = $"?limit={limit}";
+        var queryParams = $"?limit={limit}&extended=full";
         if (ignoreCollected)
         {
             queryParams += "&ignore_collected=true";
@@ -339,7 +339,7 @@ public class TraktApi
     public async Task<TraktWatchedShow[]> GetWatchedShows(TraktUser traktUser)
     {
         using var httpClient = await CreateTraktClient(traktUser);
-        var response = await httpClient.GetAsync("/sync/watched/shows");
+        var response = await httpClient.GetAsync("/sync/watched/shows?extended=full");
 
         if (!response.IsSuccessStatusCode)
         {

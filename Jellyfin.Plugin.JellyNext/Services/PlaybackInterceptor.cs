@@ -295,31 +295,13 @@ public class PlaybackInterceptor : IHostedService
 
     private bool DetectAnime(ContentItem item)
     {
-        // Simple anime detection heuristic
-        // Can be enhanced later with:
-        // - Genre information from Trakt
-        // - TVDB tags
-        // - User configuration
-        // - Machine learning based on title patterns
-
-        var title = item.Title?.ToLowerInvariant() ?? string.Empty;
-
-        // Common anime indicators in titles
-        var animeKeywords = new[]
+        // Anime detection based on Trakt genre metadata
+        if (item.Genres != null && item.Genres.Length > 0)
         {
-            "anime",
-            "shippuden",
-            "no hero academia",
-            "attack on titan",
-            "dragon ball",
-            "one piece",
-            "naruto",
-            "bleach",
-            "demon slayer",
-            "death note"
-        };
+            return item.Genres.Any(g => g.Equals("anime", StringComparison.OrdinalIgnoreCase));
+        }
 
-        return animeKeywords.Any(keyword => title.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        return false;
     }
 
     private async Task SendUserNotification(string? sessionId, string message)
