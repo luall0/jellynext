@@ -42,7 +42,6 @@ Jellyfin.Plugin.JellyNext/
 │   ├── Sonarr/             # Series, Season, QualityProfile, etc.
 │   └── Trakt/              # TraktUser, TraktMovie, TraktShow, TraktIds, etc.
 ├── Providers/              # Content provider implementations (IContentProvider)
-├── Resolvers/              # Jellyfin item resolvers (JellyNextResolver.cs)
 ├── Resources/              # Embedded resources (dummy.mp4)
 ├── ScheduledTasks/         # Background tasks (ContentSyncScheduledTask.cs)
 ├── Services/               # Business logic (TraktApi, ContentSync, Radarr/Sonarr, etc.)
@@ -70,14 +69,14 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - **API**: REST endpoints for Trakt OAuth, Radarr/Sonarr operations, library queries
 - **Services**: External integrations (TraktApi, RadarrService, SonarrService), orchestration (ContentSyncService), caching (ContentCacheService), library queries (LocalLibraryService)
 - **Providers**: Pluggable content sources implementing `IContentProvider` (fetch recommendations, next seasons)
-- **Virtual Library**: Stub file management (VirtualLibraryManager), Jellyfin entity mapping (JellyNextResolver)
+- **Virtual Library**: Stub file management (VirtualLibraryManager)
 - **Playback Interceptor**: Event listener triggering downloads on virtual item playback
 
 ### File-by-File Responsibilities
 
 **Core Entry Points**:
 - `Plugin.cs`: Singleton instance, polling task tracking, configuration, web page registration
-- `PluginServiceRegistrator.cs`: All DI registrations (services, providers, resolvers, hosted services)
+- `PluginServiceRegistrator.cs`: All DI registrations (services, providers, hosted services)
 
 **API Controllers** (`/Api/`):
 - `TraktController.cs`: OAuth device flow, token polling/refresh, user unlinking, per-user settings (GET/POST `/Users/{userGuid}/Settings`)
@@ -107,7 +106,6 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `VirtualLibraryContentTypeHelper.cs`: Maps content types to directories/providers/display names
 
 **Jellyfin Integration**:
-- `Resolvers/JellyNextResolver.cs`: IItemResolver mapping .strm files to Movie/Series entities (extracts IDs/metadata from filenames)
 - `ScheduledTasks/ContentSyncScheduledTask.cs`: IScheduledTask (6hr interval, calls ContentSyncService, triggers library scan)
 
 **Configuration**:
@@ -208,10 +206,10 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 - **File formats**:
   - Movies: `Title (Year) [tmdbid-ID].strm`
   - Shows: `Title (Year) [tvdbid-ID]/S##E01 - Download Season #.strm` (seasons 1-10, or single stub for Next Seasons)
-- **Regex patterns**:
+- **Regex patterns** (used by PlaybackInterceptor):
   - Path: `jellynext-virtual[/\\]([a-f0-9-]+)[/\\]([^/\\]+)[/\\]` (userId + content type)
   - Movie: `\[tmdbid-(\d+)\]$` | Show: `\[tvdbid-(\d+)\]$`
-- **Provider IDs required**: Movies need TMDB+IMDB, Shows need TVDB+TMDB+IMDB
+- **Native Resolution**: Jellyfin's default resolvers handle stub files automatically via standard naming conventions (`[tmdbid-X]` / `[tvdbid-X]` tags), no custom resolver needed
 
 ### FFprobe Compatibility (iOS/tvOS Fix)
 - **Problem**: iOS/tvOS probe .strm files with FFprobe → crash on invalid/empty files

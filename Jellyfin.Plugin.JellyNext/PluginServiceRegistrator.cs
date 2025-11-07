@@ -1,5 +1,4 @@
 using Jellyfin.Plugin.JellyNext.Providers;
-using Jellyfin.Plugin.JellyNext.Resolvers;
 using Jellyfin.Plugin.JellyNext.Services;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
@@ -30,9 +29,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 
         // Sync service (must be registered after providers)
         serviceCollection.AddSingleton<ContentSyncService>();
-
-        // Resolvers
-        serviceCollection.AddSingleton<IItemResolver, JellyNextResolver>();
 
         // Virtual library
         serviceCollection.AddSingleton<VirtualLibrary.VirtualLibraryManager>();
