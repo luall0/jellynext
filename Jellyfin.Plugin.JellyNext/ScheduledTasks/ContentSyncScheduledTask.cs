@@ -166,10 +166,12 @@ public class ContentSyncScheduledTask : IScheduledTask
     /// <inheritdoc />
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        // Default to 6 hours - users can configure this in Jellyfin Dashboard
-        // Note: Startup sync is handled by StartupSyncService (not via triggers)
         return new[]
         {
+            new TaskTriggerInfo
+            {
+                Type = TaskTriggerInfoType.StartupTrigger
+            },
             new TaskTriggerInfo
             {
                 Type = TaskTriggerInfoType.IntervalTrigger,

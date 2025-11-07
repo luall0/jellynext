@@ -36,6 +36,5 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 
         // Hosted services
         serviceCollection.AddHostedService<PlaybackInterceptor>();
-        serviceCollection.AddHostedService<StartupSyncService>();
     }
 }
