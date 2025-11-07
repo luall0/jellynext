@@ -222,12 +222,21 @@
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Cache Settings</h3>
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="CacheExpirationHours">Cache Expiration (hours):</label>
+                            <label class="inputLabel inputLabelUnfocused" for="CacheExpirationHours">Content Cache Expiration (hours):</label>
                             <input is="emby-input" type="number" id="CacheExpirationHours" name="CacheExpirationHours" min="1" max="168" />
                             <div class="fieldDescription">
                                 How long cached content remains valid before requiring a fresh fetch from Trakt (1-168 hours).
                                 Cached data is served instantly when browsing virtual libraries, avoiding API rate limits and improving performance.
                                 Configure sync schedule in Dashboard → Scheduled Tasks → "Sync Trakt Content".
+                            </div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="EndedShowsCacheExpirationDays">Ended/Canceled Shows Cache (days):</label>
+                            <input is="emby-input" type="number" id="EndedShowsCacheExpirationDays" name="EndedShowsCacheExpirationDays" min="1" max="365" />
+                            <div class="fieldDescription">
+                                How long to cache ended/canceled shows before re-checking (1-365 days, default: 7).
+                                Shows marked as "ended" or "canceled" by Trakt are cached to reduce API calls.
+                                Longer values reduce API usage but may miss shows that get renewed.
                             </div>
                         </div>
                     </div>
@@ -653,6 +662,7 @@
                     document.getElementById('SonarrUrl').value = config.SonarrUrl || '';
                     document.getElementById('SonarrApiKey').value = config.SonarrApiKey || '';
                     document.getElementById('CacheExpirationHours').value = config.CacheExpirationHours || 6;
+                    document.getElementById('EndedShowsCacheExpirationDays').value = config.EndedShowsCacheExpirationDays || 7;
 
                     // If Radarr is configured, show a hint to test connection to see options
                     if (config.RadarrUrl && config.RadarrApiKey) {
@@ -713,6 +723,7 @@
                     }
 
                     config.CacheExpirationHours = parseInt(document.getElementById('CacheExpirationHours').value);
+                    config.EndedShowsCacheExpirationDays = parseInt(document.getElementById('EndedShowsCacheExpirationDays').value);
 
                     ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);

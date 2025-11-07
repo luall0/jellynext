@@ -19,6 +19,7 @@ services:
       # Jellyfin data persistence (optional, comment out for clean start each time)
       - ./jellyfin-config:/config
       - jellyfin-cache:/cache
+      - ./../media_server/data/media/tv:/data
     networks:
       - media_network
     ports:

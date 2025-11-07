@@ -31,4 +31,10 @@ public class TraktShow
     /// </summary>
     [JsonPropertyName("genres")]
     public string[] Genres { get; set; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Gets or sets the show status (e.g., "ended", "returning series", "canceled").
+    /// </summary>
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
 }

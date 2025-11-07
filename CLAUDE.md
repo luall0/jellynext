@@ -87,7 +87,8 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 **Services** (`/Services/`):
 - `TraktApi.cs`: Trakt API client (OAuth, recommendations, watchlist, watched progress)
 - `ContentCacheService.cs`: In-memory cache (per-user, per-provider, 6hr expiration)
-- `ContentSyncService.cs`: Sync orchestrator (iterates users/providers, updates cache/virtual library)
+- `EndedShowsCacheService.cs`: Cross-user cache for ended/canceled shows (7 day default expiration, configurable)
+- `ContentSyncService.cs`: Sync orchestrator (iterates users/providers, updates cache/virtual library, cleans expired shows)
 - `RadarrService.cs`: Radarr API client (movie search/add)
 - `SonarrService.cs`: Sonarr API client (series search/add, per-season monitoring, anime detection)
 - `LocalLibraryService.cs`: Jellyfin library queries (find series by TVDB ID, exclude virtual items)
@@ -95,8 +96,8 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 
 **Providers** (`/Providers/`):
 - `IContentProvider.cs`: Interface (ProviderName, LibraryName, FetchContentAsync, IsEnabledForUser)
-- `RecommendationsProvider.cs`: Fetches Trakt recommendations, respects per-user `SyncMovieRecommendations`/`SyncShowRecommendations` flags and filters (`IgnoreCollected`, `IgnoreWatchlisted`)
-- `NextSeasonsProvider.cs`: Fetches immediate next unwatched season, respects per-user `SyncNextSeasons` flag
+- `RecommendationsProvider.cs`: Fetches Trakt recommendations, uses ended shows cache to skip season API calls for ended/canceled shows
+- `NextSeasonsProvider.cs`: Fetches immediate next unwatched season, uses ended shows cache to skip re-checking completed shows
 
 **Virtual Library** (`/VirtualLibrary/`):
 - `VirtualLibraryManager.cs`: Stub file creation/management, dummy.mp4 extraction, .keep file maintenance
@@ -193,6 +194,14 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 - Only suggests **immediate next season** (not all missing seasons)
 - Filters: aired episodes > 0, not in local library (via TVDB ID matching)
 - Creates ONE stub per show (not seasons 1-10 like recommendations)
+- Uses ended shows cache to skip re-querying completed shows
+
+### Ended Shows Cache
+- **Purpose**: Reduce API calls for shows with status "ended" or "canceled" (won't get new seasons)
+- **Shared cache**: Both RecommendationsProvider and NextSeasonsProvider use same cache instance
+- **Expiration**: Configurable via `EndedShowsCacheExpirationDays` (default: 7 days, range: 1-365)
+- **Cleanup**: Automatic during each ContentSync, removes expired entries
+- **Behavior**: Cache season count on first fetch, reuse on subsequent syncs (skips GetShowSeasons API call)
 
 ### Jellyfin 10.11 API Changes
 - **UserDataManager**: Requires `User` entity (not `Guid`) - inject `IUserManager`, use `GetUserById(Guid)`

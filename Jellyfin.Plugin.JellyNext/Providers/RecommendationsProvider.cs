@@ -19,16 +19,22 @@ public class RecommendationsProvider : IContentProvider
 {
     private readonly ILogger<RecommendationsProvider> _logger;
     private readonly TraktApi _traktApi;
+    private readonly EndedShowsCacheService _endedShowsCache;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RecommendationsProvider"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="traktApi">The Trakt API service.</param>
-    public RecommendationsProvider(ILogger<RecommendationsProvider> logger, TraktApi traktApi)
+    /// <param name="endedShowsCache">The ended shows cache service.</param>
+    public RecommendationsProvider(
+        ILogger<RecommendationsProvider> logger,
+        TraktApi traktApi,
+        EndedShowsCacheService endedShowsCache)
     {
         _logger = logger;
         _traktApi = traktApi;
+        _endedShowsCache = endedShowsCache;
     }
 
     /// <inheritdoc />
@@ -100,21 +106,57 @@ public class RecommendationsProvider : IContentProvider
 
                 foreach (var show in shows)
                 {
-                    // Fetch season information to determine how many seasons have actually aired
+                    // Check if show is ended/canceled and in cache
+                    var isEnded = !string.IsNullOrEmpty(show.Status) &&
+                                  (show.Status.Equals("ended", StringComparison.OrdinalIgnoreCase) ||
+                                   show.Status.Equals("canceled", StringComparison.OrdinalIgnoreCase));
+
                     int? airedSeasonCount = null;
-                    try
+
+                    // If ended/canceled and in cache, use cached season count (skip API call)
+                    if (isEnded && show.Ids.Tvdb != null && show.Ids.Tvdb > 0)
                     {
-                        var seasons = await _traktApi.GetShowSeasons(traktUser, show.Ids.Trakt);
-                        // Count seasons that have aired episodes (excluding specials which are season 0)
-                        airedSeasonCount = seasons.Count(s => s.Number > 0 && s.AiredEpisodes > 0);
-                        _logger.LogDebug(
-                            "Show {Title} has {SeasonCount} aired seasons",
-                            show.Title,
-                            airedSeasonCount);
+                        var cachedMetadata = _endedShowsCache.GetEndedShow(show.Ids.Tvdb.Value);
+                        if (cachedMetadata != null)
+                        {
+                            airedSeasonCount = cachedMetadata.LastSeasonWatched;
+                            _logger.LogDebug(
+                                "Using cached season count for ended/canceled show: {Title} (TVDB: {TvdbId}, Seasons: {Seasons})",
+                                show.Title,
+                                show.Ids.Tvdb.Value,
+                                airedSeasonCount);
+                        }
                     }
-                    catch (Exception ex)
+
+                    // Only fetch season information if not in cache
+                    if (!airedSeasonCount.HasValue)
                     {
-                        _logger.LogWarning(ex, "Failed to fetch season info for show {Title}, will use default", show.Title);
+                        try
+                        {
+                            var seasons = await _traktApi.GetShowSeasons(traktUser, show.Ids.Trakt);
+                            // Count seasons that have aired episodes (excluding specials which are season 0)
+                            airedSeasonCount = seasons.Count(s => s.Number > 0 && s.AiredEpisodes > 0);
+                            _logger.LogDebug(
+                                "Show {Title} has {SeasonCount} aired seasons",
+                                show.Title,
+                                airedSeasonCount);
+
+                            // If show is ended/canceled and we fetched season info, cache it for future
+                            if (isEnded && show.Ids.Tvdb != null && show.Ids.Tvdb > 0 && airedSeasonCount.HasValue)
+                            {
+                                _endedShowsCache.MarkShowAsEnded(show, airedSeasonCount.Value);
+                                _logger.LogDebug(
+                                    "Cached ended/canceled show from recommendations: {Title} (TVDB: {TvdbId}, Status: {Status}, Seasons: {Seasons})",
+                                    show.Title,
+                                    show.Ids.Tvdb.Value,
+                                    show.Status,
+                                    airedSeasonCount.Value);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to fetch season info for show {Title}, will use default", show.Title);
+                        }
                     }
 
                     contentItems.Add(new ContentItem

@@ -20,6 +20,7 @@ public class NextSeasonsProvider : IContentProvider
     private readonly ILogger<NextSeasonsProvider> _logger;
     private readonly TraktApi _traktApi;
     private readonly LocalLibraryService _localLibraryService;
+    private readonly EndedShowsCacheService _endedShowsCache;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NextSeasonsProvider"/> class.
@@ -27,14 +28,17 @@ public class NextSeasonsProvider : IContentProvider
     /// <param name="logger">The logger.</param>
     /// <param name="traktApi">The Trakt API service.</param>
     /// <param name="localLibraryService">The local library service.</param>
+    /// <param name="endedShowsCache">The ended shows cache service.</param>
     public NextSeasonsProvider(
         ILogger<NextSeasonsProvider> logger,
         TraktApi traktApi,
-        LocalLibraryService localLibraryService)
+        LocalLibraryService localLibraryService,
+        EndedShowsCacheService endedShowsCache)
     {
         _logger = logger;
         _traktApi = traktApi;
         _localLibraryService = localLibraryService;
+        _endedShowsCache = endedShowsCache;
     }
 
     /// <inheritdoc />
@@ -83,10 +87,11 @@ public class NextSeasonsProvider : IContentProvider
                 try
                 {
                     _logger.LogInformation(
-                        "Processing show: {Title} (Trakt ID: {TraktId}, TVDB ID: {TvdbId})",
+                        "Processing show: {Title} (Trakt ID: {TraktId}, TVDB ID: {TvdbId}, Status: {Status})",
                         watchedShow.Show.Title,
                         watchedShow.Show.Ids.Trakt,
-                        watchedShow.Show.Ids.Tvdb);
+                        watchedShow.Show.Ids.Tvdb,
+                        watchedShow.Show.Status ?? "unknown");
 
                     // Skip shows without TVDB ID (we need it to match with local library)
                     if (watchedShow.Show.Ids.Tvdb == null || watchedShow.Show.Ids.Tvdb == 0)
@@ -106,6 +111,34 @@ public class NextSeasonsProvider : IContentProvider
                     if (!watchedSeasons.Any())
                     {
                         continue;
+                    }
+
+                    var highestWatchedSeason = watchedSeasons.First();
+
+                    // Check if show is marked as ended or canceled
+                    var isEnded = !string.IsNullOrEmpty(watchedShow.Show.Status) &&
+                                  (watchedShow.Show.Status.Equals("ended", StringComparison.OrdinalIgnoreCase) ||
+                                   watchedShow.Show.Status.Equals("canceled", StringComparison.OrdinalIgnoreCase));
+
+                    // If show is ended/canceled, check the cache
+                    if (isEnded && _endedShowsCache.IsShowEnded(tvdbId))
+                    {
+                        var cachedMetadata = _endedShowsCache.GetEndedShow(tvdbId);
+                        if (cachedMetadata != null)
+                        {
+                            // Update last watched season if this user has progressed further
+                            if (highestWatchedSeason > cachedMetadata.LastSeasonWatched)
+                            {
+                                _endedShowsCache.MarkShowAsEnded(watchedShow.Show, highestWatchedSeason);
+                            }
+
+                            _logger.LogDebug(
+                                "Skipping ended/canceled show from cache: {Title} (TVDB: {TvdbId}, Status: {Status})",
+                                watchedShow.Show.Title,
+                                tvdbId,
+                                cachedMetadata.Status);
+                            continue;
+                        }
                     }
 
                     // Get all available seasons from Trakt to verify the next season exists
@@ -136,13 +169,22 @@ public class NextSeasonsProvider : IContentProvider
                         .Select(s => s.Number)
                         .ToHashSet();
 
-                    // Find the highest watched season
-                    var highestWatchedSeason = watchedSeasons.First(); // Already ordered descending
                     var nextSeasonNumber = highestWatchedSeason + 1;
 
                     // Check if this next season has been released (exists in Trakt)
                     if (!availableSeasonNumbers.Contains(nextSeasonNumber))
                     {
+                        // If show is ended/canceled and no next season exists, cache it
+                        if (isEnded)
+                        {
+                            _endedShowsCache.MarkShowAsEnded(watchedShow.Show, highestWatchedSeason);
+                            _logger.LogInformation(
+                                "Cached ended/canceled show with no more seasons: {Title} (TVDB: {TvdbId}, Status: {Status})",
+                                watchedShow.Show.Title,
+                                tvdbId,
+                                watchedShow.Show.Status);
+                        }
+
                         continue;
                     }
 
@@ -164,6 +206,17 @@ public class NextSeasonsProvider : IContentProvider
                             SeasonNumber = nextSeasonNumber,
                             Genres = watchedShow.Show.Genres
                         });
+                    }
+                    else if (isEnded)
+                    {
+                        // If show is ended/canceled and next season exists locally, cache it
+                        _endedShowsCache.MarkShowAsEnded(watchedShow.Show, nextSeasonNumber);
+                        _logger.LogInformation(
+                            "Cached ended/canceled show with season {Season} in library: {Title} (TVDB: {TvdbId}, Status: {Status})",
+                            nextSeasonNumber,
+                            watchedShow.Show.Title,
+                            tvdbId,
+                            watchedShow.Show.Status);
                     }
                 }
                 catch (Exception ex)
