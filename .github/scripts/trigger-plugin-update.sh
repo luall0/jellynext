@@ -2,7 +2,7 @@
 set -e
 
 # Script to trigger plugin repository update via GitHub API
-# This handles proper JSON escaping for the changelog
+# Uses jq for proper JSON escaping of all special characters
 
 GUID="$1"
 CHECKSUM="$2"
@@ -12,34 +12,26 @@ SOURCE_URL="$5"
 VERSION="$6"
 PAT_TOKEN="$7"
 
-# Escape the changelog for JSON:
-# - Escape backslashes first
-# - Escape double quotes
-# - Escape newlines
-# - Escape tabs
-# - Remove carriage returns
-ESCAPED_CHANGELOG=$(echo "$CHANGELOG" | \
-  sed 's/\\/\\\\/g' | \
-  sed 's/"/\\"/g' | \
-  sed ':a;N;$!ba;s/\n/\\n/g' | \
-  sed 's/\t/\\t/g' | \
-  tr -d '\r')
-
-# Create the JSON payload
-JSON_PAYLOAD=$(cat <<EOF
-{
-  "event_type": "external_trigger",
-  "client_payload": {
-    "guid": "${GUID}",
-    "checksum": "${CHECKSUM}",
-    "changelog": "${ESCAPED_CHANGELOG}",
-    "targetAbi": "${TARGET_ABI}",
-    "sourceUrl": "${SOURCE_URL}",
-    "version": "${VERSION}"
-  }
-}
-EOF
-)
+# Create the JSON payload using jq for proper escaping
+# This handles quotes, apostrophes, newlines, and all other special characters
+JSON_PAYLOAD=$(jq -n \
+  --arg guid "$GUID" \
+  --arg checksum "$CHECKSUM" \
+  --arg changelog "$CHANGELOG" \
+  --arg targetAbi "$TARGET_ABI" \
+  --arg sourceUrl "$SOURCE_URL" \
+  --arg version "$VERSION" \
+  '{
+    event_type: "external_trigger",
+    client_payload: {
+      guid: $guid,
+      checksum: $checksum,
+      changelog: $changelog,
+      targetAbi: $targetAbi,
+      sourceUrl: $sourceUrl,
+      version: $version
+    }
+  }')
 
 # Send the API request
 curl -X POST \
