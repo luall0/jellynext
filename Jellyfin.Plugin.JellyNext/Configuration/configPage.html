@@ -853,7 +853,10 @@
 
                     // Save trending movies configuration
                     config.TrendingMoviesEnabled = document.getElementById('TrendingMoviesEnabled').checked;
-                    config.TrendingMoviesUserId = document.getElementById('TrendingMoviesUser').value || '';
+                    var trendingUserId = document.getElementById('TrendingMoviesUser').value;
+                    if (config.TrendingMoviesEnabled && trendingUserId) {
+                        config.TrendingMoviesUserId = trendingUserId;
+                    }
                     config.TrendingMoviesLimit = parseInt(document.getElementById('TrendingMoviesLimit').value) || 50;
 
                     ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {

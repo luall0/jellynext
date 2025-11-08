@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.0.1
+
+### Bug Fixes
+
+- **Configuration Save Error**: Fix `System.FormatException` when saving configuration with trending movies disabled
+  - `TrendingMoviesUserId` is now only included in configuration POST when trending is enabled and a valid user is selected
+  - Prevents empty string from being parsed as GUID when trending movies is not configured
+
 ## v1.1.0.0
 
 ### Features
