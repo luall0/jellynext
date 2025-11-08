@@ -244,6 +244,11 @@ Navigate to: **Dashboard → Plugins → JellyNext → Settings**
 - **Cache Expiration (hours)**: How long to cache recommendations before refreshing (default: 6 hours)
 - **Ended Shows Cache (days)**: How long to cache ended/canceled shows to reduce API calls (default: 7 days, range: 1-365)
 
+#### Playback Settings (Optional)
+- **Playback Stop Delay (seconds)**: Delay before automatically stopping playback of virtual items (default: 2 seconds, range: 0-30)
+  - Increase if your client needs more time before playback can be stopped
+  - Set to 0 for immediate stop (may not work on all clients)
+
 Click **Save** when done.
 
 ## Usage
@@ -308,10 +313,45 @@ User clicks Play → PlaybackInterceptor detects virtual path
                  ↓
          Adds to download queue
                  ↓
+         Sends notification to user
+                 ↓
+         Waits 2 seconds (configurable)
+                 ↓
          Stops playback & clears "watched" status
 ```
 
-This all happens in seconds, invisible to the user.
+This all happens in seconds, mostly invisible to the user.
+
+### Playback Stop Behavior
+
+When you click "Play" on a virtual library item, JellyNext triggers the download and then automatically stops playback. Here's what you need to know:
+
+**What You'll See:**
+1. **Notification**: A message appears confirming the download has been added to your queue
+2. **Playback Stops**: After a brief delay (default: 2 seconds), playback stops automatically
+
+**Client Compatibility:**
+- **Automatic stop** uses Jellyfin's native playback control API
+- **Most clients support this**: Jellyfin Web, Android, iOS, many TV apps
+- **Some clients may not respond** to the automatic stop command (this is a client limitation, not a plugin issue)
+
+**If Playback Doesn't Stop Automatically:**
+- **Simply stop it manually** by clicking the stop/back button on your client
+- This is normal for clients that don't fully support Jellyfin's playback control API
+- The download has already been triggered - stopping playback just prevents the dummy video from playing
+
+**Why the Delay?**
+- Some clients need time to initialize playback before they can receive a stop command
+- Default delay: 2 seconds (configurable: 0-30 seconds)
+- Adjust in: **Dashboard → Plugins → JellyNext → Playback Settings → Playback Stop Delay**
+
+**Client Support:**
+If your client doesn't support automatic playback stop, this is a Jellyfin native feature limitation. You can:
+- Ask the client developer when automatic playback control will be supported
+- Continue using the plugin - just manually stop playback after the notification appears
+- The download functionality works perfectly regardless of automatic stop support
+
+**Important:** The download is triggered immediately when you click "Play" - the playback stop is just to prevent the dummy video from playing. Even if playback doesn't stop automatically, the download has already been added to Radarr/Sonarr.
 
 ## Development
 

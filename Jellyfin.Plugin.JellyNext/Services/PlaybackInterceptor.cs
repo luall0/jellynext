@@ -116,9 +116,15 @@ public class PlaybackInterceptor : IHostedService
                 _logger.LogWarning("Unknown content type in virtual item path: {Path}", e.Item.Path);
             }
 
-            // Stop playback immediately
+            // Stop playback after configured delay (some clients need time to initialize)
+            var config = Plugin.Instance?.Configuration;
+            var delaySeconds = config?.PlaybackStopDelaySeconds ?? 2;
+
             try
             {
+                _logger.LogDebug("Waiting {Delay}s before stopping playback", delaySeconds);
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+
                 await _sessionManager.SendPlaystateCommand(
                     null,
                     e.Session.Id,

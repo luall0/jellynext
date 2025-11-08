@@ -71,6 +71,12 @@ public class PluginConfiguration : BasePluginConfiguration
     public int EndedShowsCacheExpirationDays { get; set; } = 7;
 
     /// <summary>
+    /// Gets or sets the delay in seconds before stopping playback of virtual items (default: 2 seconds).
+    /// Some clients need time before playback can be stopped reliably.
+    /// </summary>
+    public int PlaybackStopDelaySeconds { get; set; } = 2;
+
+    /// <summary>
     /// Gets or sets the array of per-user Trakt configurations.
     /// </summary>
     public TraktUser[] TraktUsers { get; set; } = Array.Empty<TraktUser>();

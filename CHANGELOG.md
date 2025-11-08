@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.0.1.0
+
+### Features
+
+- **Configurable Playback Stop Delay**: Added setting to configure delay before stopping playback of virtual items (default: 2 seconds, range: 0-30)
+  - Allows users to adjust timing for clients that need more initialization time
+  - Configurable via Dashboard → Plugins → JellyNext → Playback Settings
+
+### Improvements
+
+- **Reduced Default Playback Delay**: Changed default playback stop delay from 5 seconds to 2 seconds for faster user experience
+- **Enhanced Documentation**: Added comprehensive "Playback Stop Behavior" section to README explaining:
+  - How automatic playback stop works
+  - Client compatibility information
+  - Instructions for clients that don't support automatic stop
+  - Clarification that download triggers immediately regardless of stop behavior
+
 ## v1.0.0.1
 
 ### Bug Fixes
