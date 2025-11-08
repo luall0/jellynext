@@ -48,7 +48,7 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          CHANGELOG=$(sed -n "/## v${VERSION}/,/## v/p" CHANGELOG.md | sed '1!{/## v/d;}' | sed '1d')
+          CHANGELOG=$(sed -n "/## v${VERSION}/,/## v/p" CHANGELOG.md | sed '1!{/## v/d;}' | sed '1d' | sed "s/'/\\\\'/g")
           if [ -z "$CHANGELOG" ]; then
             echo "No changelog found for version ${VERSION}"
             CHANGELOG="Release v${VERSION}"
