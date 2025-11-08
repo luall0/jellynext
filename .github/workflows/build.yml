@@ -86,7 +86,7 @@ jobs:
       - name: Trigger plugin repository update
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog }}
+          CHANGELOG_CONTENT: ${{ toJSON(steps.changelog.outputs.changelog) }}
         run: |
           .github/scripts/trigger-plugin-update.sh \
             "a4df60c5-6ab4-412a-8f79-2cab93fb2bc5" \
