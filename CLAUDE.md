@@ -169,7 +169,8 @@ Background: Plugin.PollingTasks[userGuid] = TraktApi.PollForTokenAsync()
 
 ### Per-User Architecture
 - Each user has own Trakt OAuth token (stored in `PluginConfiguration.TraktUsers[]`)
-- Per-user sync settings: `SyncMovieRecommendations`, `SyncShowRecommendations`, `SyncNextSeasons`, `IgnoreCollected`, `IgnoreWatchlisted`, `LimitShowsToSeasonOne` (all in `TraktUser` model)
+- Per-user sync settings: `SyncMovieRecommendations`, `SyncShowRecommendations`, `SyncNextSeasons`, `IgnoreCollected`, `IgnoreWatchlisted`, `LimitShowsToSeasonOne`, `MovieRecommendationsLimit`, `ShowRecommendationsLimit` (all in `TraktUser` model)
+- Recommendation limits: User-configurable 1-100 (default: 50), validated with `Math.Clamp()` on save
 - Virtual libraries filtered by userId extracted from path
 - Access via `UserHelper.GetTraktUser(userGuid)`
 - Providers check `IsEnabledForUser()` which respects per-user sync flags

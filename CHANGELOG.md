@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.3.0
+
+### Features
+
+- **Per-User Recommendation Limits**: Added configurable limits for movie and show recommendations (1-100, default: 50)
+  - New settings: `MovieRecommendationsLimit` and `ShowRecommendationsLimit` in per-user configuration
+  - Configurable via Dashboard → Plugins → JellyNext → User Settings
+  - Validated on both client and server with `Math.Clamp()` to enforce 1-100 range
+  - Each user can control how many recommendations they want to fetch
+
 ## v1.0.2.0
 
 ### Features

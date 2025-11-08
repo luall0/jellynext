@@ -153,7 +153,9 @@ public class TraktController : ControllerBase
             syncNextSeasons = traktUser.SyncNextSeasons,
             ignoreCollected = traktUser.IgnoreCollected,
             ignoreWatchlisted = traktUser.IgnoreWatchlisted,
-            limitShowsToSeasonOne = traktUser.LimitShowsToSeasonOne
+            limitShowsToSeasonOne = traktUser.LimitShowsToSeasonOne,
+            movieRecommendationsLimit = traktUser.MovieRecommendationsLimit,
+            showRecommendationsLimit = traktUser.ShowRecommendationsLimit
         });
     }
 
@@ -181,6 +183,8 @@ public class TraktController : ControllerBase
         traktUser.IgnoreCollected = settings.IgnoreCollected;
         traktUser.IgnoreWatchlisted = settings.IgnoreWatchlisted;
         traktUser.LimitShowsToSeasonOne = settings.LimitShowsToSeasonOne;
+        traktUser.MovieRecommendationsLimit = Math.Clamp(settings.MovieRecommendationsLimit, 1, 100);
+        traktUser.ShowRecommendationsLimit = Math.Clamp(settings.ShowRecommendationsLimit, 1, 100);
 
         Plugin.Instance?.SaveConfiguration();
 
@@ -223,5 +227,15 @@ public class TraktController : ControllerBase
         /// Gets or sets a value indicating whether to limit shows to season 1 only.
         /// </summary>
         public bool LimitShowsToSeasonOne { get; set; }
+
+        /// <summary>
+        /// Gets or sets the number of movie recommendations to fetch (1-100).
+        /// </summary>
+        public int MovieRecommendationsLimit { get; set; }
+
+        /// <summary>
+        /// Gets or sets the number of show recommendations to fetch (1-100).
+        /// </summary>
+        public int ShowRecommendationsLimit { get; set; }
     }
 }

@@ -97,11 +97,12 @@ public class RecommendationsProvider : IContentProvider
 
     private async Task FetchMovieRecommendationsAsync(TraktUser traktUser, List<ContentItem> contentItems)
     {
+        var limit = Math.Clamp(traktUser.MovieRecommendationsLimit, 1, 100);
         var movies = await _traktApi.GetMovieRecommendations(
             traktUser,
             traktUser.IgnoreCollected,
             traktUser.IgnoreWatchlisted,
-            limit: 50);
+            limit: limit);
 
         foreach (var movie in movies)
         {
@@ -121,11 +122,12 @@ public class RecommendationsProvider : IContentProvider
 
     private async Task FetchShowRecommendationsAsync(TraktUser traktUser, List<ContentItem> contentItems)
     {
+        var limit = Math.Clamp(traktUser.ShowRecommendationsLimit, 1, 100);
         var shows = await _traktApi.GetShowRecommendations(
             traktUser,
             traktUser.IgnoreCollected,
             traktUser.IgnoreWatchlisted,
-            limit: 50);
+            limit: limit);
 
         foreach (var show in shows)
         {

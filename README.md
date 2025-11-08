@@ -146,6 +146,10 @@ After authorization, configure what to sync for each user:
 - ☑️ **Sync Show Recommendations**: Enable Trakt Show Recommendations library
 - ☑️ **Sync Next Seasons**: Enable Trakt Next Seasons library
 
+**Recommendation Limits:**
+- **Movie Recommendations Limit**: Number of movie recommendations to fetch (1-100, default: 50)
+- **Show Recommendations Limit**: Number of show recommendations to fetch (1-100, default: 50)
+
 **Filtering Options:**
 - ☑️ **Ignore Collected Items**: Exclude movies/shows already in your Trakt collection (recommended)
 - ☐ **Ignore Watchlisted Items**: Exclude items on your Trakt watchlist (if you don't want to download them yet)

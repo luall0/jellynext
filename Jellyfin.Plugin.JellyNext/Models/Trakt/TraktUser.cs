@@ -61,4 +61,14 @@ public class TraktUser
     /// Gets or sets a value indicating whether to limit show recommendations to season 1 only (improves Jellyfin scan performance).
     /// </summary>
     public bool LimitShowsToSeasonOne { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the number of movie recommendations to fetch (1-100).
+    /// </summary>
+    public int MovieRecommendationsLimit { get; set; } = 50;
+
+    /// <summary>
+    /// Gets or sets the number of show recommendations to fetch (1-100).
+    /// </summary>
+    public int ShowRecommendationsLimit { get; set; } = 50;
 }

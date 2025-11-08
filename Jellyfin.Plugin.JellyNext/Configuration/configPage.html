@@ -73,6 +73,22 @@
                                         </div>
                                     </div>
 
+                                    <h4 class="sectionTitle" style="font-size: 1em; margin-top: 1.5em;">Recommendation Limits</h4>
+                                    <div class="inputContainer">
+                                        <label class="inputLabel inputLabelUnfocused" for="UserMovieRecommendationsLimit">Movie Recommendations Limit:</label>
+                                        <input is="emby-input" type="number" id="UserMovieRecommendationsLimit" name="UserMovieRecommendationsLimit" min="1" max="100" />
+                                        <div class="fieldDescription">
+                                            Number of movie recommendations to fetch (1-100)
+                                        </div>
+                                    </div>
+                                    <div class="inputContainer">
+                                        <label class="inputLabel inputLabelUnfocused" for="UserShowRecommendationsLimit">Show Recommendations Limit:</label>
+                                        <input is="emby-input" type="number" id="UserShowRecommendationsLimit" name="UserShowRecommendationsLimit" min="1" max="100" />
+                                        <div class="fieldDescription">
+                                            Number of show recommendations to fetch (1-100)
+                                        </div>
+                                    </div>
+
                                     <h4 class="sectionTitle" style="font-size: 1em; margin-top: 1.5em;">Recommendation Filters</h4>
                                     <div class="checkboxContainer checkboxContainer-withDescription">
                                         <label>
@@ -361,6 +377,8 @@
                     document.getElementById('UserIgnoreCollected').checked = settings.ignoreCollected !== false;
                     document.getElementById('UserIgnoreWatchlisted').checked = settings.ignoreWatchlisted === true;
                     document.getElementById('UserLimitShowsToSeasonOne').checked = settings.limitShowsToSeasonOne !== false;
+                    document.getElementById('UserMovieRecommendationsLimit').value = settings.movieRecommendationsLimit || 50;
+                    document.getElementById('UserShowRecommendationsLimit').value = settings.showRecommendationsLimit || 50;
                 }).catch(function (error) {
                     console.error('Error loading user settings:', error);
                 });
@@ -380,7 +398,9 @@
                     syncNextSeasons: document.getElementById('UserSyncNextSeasons').checked,
                     ignoreCollected: document.getElementById('UserIgnoreCollected').checked,
                     ignoreWatchlisted: document.getElementById('UserIgnoreWatchlisted').checked,
-                    limitShowsToSeasonOne: document.getElementById('UserLimitShowsToSeasonOne').checked
+                    limitShowsToSeasonOne: document.getElementById('UserLimitShowsToSeasonOne').checked,
+                    movieRecommendationsLimit: parseInt(document.getElementById('UserMovieRecommendationsLimit').value) || 50,
+                    showRecommendationsLimit: parseInt(document.getElementById('UserShowRecommendationsLimit').value) || 50
                 };
 
                 ApiClient.fetch({
