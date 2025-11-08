@@ -15,26 +15,20 @@ PAT_TOKEN="$6"
 # Changelog comes from environment variable to avoid shell escaping issues
 CHANGELOG="${CHANGELOG_CONTENT}"
 
-# Create the JSON payload using jq for proper escaping
-# This handles quotes, apostrophes, newlines, and all other special characters
-JSON_PAYLOAD=$(jq -n \
-  --arg guid "$GUID" \
-  --arg checksum "$CHECKSUM" \
-  --arg changelog $CHANGELOG \
-  --arg targetAbi "$TARGET_ABI" \
-  --arg sourceUrl "$SOURCE_URL" \
-  --arg version "$VERSION" \
-  '{
-    event_type: "external_trigger",
-    client_payload: {
-      guid: $guid,
-      checksum: $checksum,
-      changelog: $changelog,
-      targetAbi: $targetAbi,
-      sourceUrl: $sourceUrl,
-      version: $version
-    }
-  }')
+JSON_PAYLOAD=$(cat <<EOF
+{
+  "event_type": "external_trigger",
+  "client_payload": {
+    "guid": "${GUID}",
+    "checksum": "${CHECKSUM}",
+    "changelog": ${CHANGELOG},
+    "targetAbi": "${TARGET_ABI}",
+    "sourceUrl": "${SOURCE_URL}",
+    "version": "${VERSION}"
+  }
+}
+EOF
+)
 
 # Send the API request
 curl -X POST \
