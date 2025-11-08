@@ -34,7 +34,7 @@ jobs:
       - name: Package plugin
         run: |
           cd Jellyfin.Plugin.JellyNext/bin/Release/net9.0
-          zip -r ../../../../../jellynext-v${{ steps.version.outputs.version }}.zip *
+          zip -r ../../../../jellynext-v${{ steps.version.outputs.version }}.zip *
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
