@@ -244,6 +244,17 @@
                     <!-- Playback Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Playback Settings</h3>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="UseShortDummyVideo" />
+                                <span>Use Short Dummy Video (2 seconds)</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                When enabled, virtual items use a 2-second dummy video that stops playback automatically on clients that don't support API playback stopping.
+                                When disabled, uses a 1-hour dummy video (prevents "watched" status but requires manual stop).
+                                Default: enabled.
+                            </div>
+                        </div>
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="PlaybackStopDelaySeconds">Playback Stop Delay (seconds):</label>
                             <input is="emby-input" type="number" id="PlaybackStopDelaySeconds" name="PlaybackStopDelaySeconds" min="0" max="30" />
@@ -678,6 +689,7 @@
                     document.getElementById('CacheExpirationHours').value = config.CacheExpirationHours || 6;
                     document.getElementById('EndedShowsCacheExpirationDays').value = config.EndedShowsCacheExpirationDays || 7;
                     document.getElementById('PlaybackStopDelaySeconds').value = config.PlaybackStopDelaySeconds !== undefined ? config.PlaybackStopDelaySeconds : 2;
+                    document.getElementById('UseShortDummyVideo').checked = config.UseShortDummyVideo !== false;
 
                     // If Radarr is configured, show a hint to test connection to see options
                     if (config.RadarrUrl && config.RadarrApiKey) {
@@ -740,6 +752,7 @@
                     config.CacheExpirationHours = parseInt(document.getElementById('CacheExpirationHours').value);
                     config.EndedShowsCacheExpirationDays = parseInt(document.getElementById('EndedShowsCacheExpirationDays').value);
                     config.PlaybackStopDelaySeconds = parseInt(document.getElementById('PlaybackStopDelaySeconds').value);
+                    config.UseShortDummyVideo = document.getElementById('UseShortDummyVideo').checked;
 
                     ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);

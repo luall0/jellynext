@@ -245,7 +245,10 @@ Navigate to: **Dashboard → Plugins → JellyNext → Settings**
 - **Ended Shows Cache (days)**: How long to cache ended/canceled shows to reduce API calls (default: 7 days, range: 1-365)
 
 #### Playback Settings (Optional)
-- **Playback Stop Delay (seconds)**: Delay before automatically stopping playback of virtual items (default: 2 seconds, range: 0-30)
+- **Use Short Dummy Video**: Use 2-second dummy video for auto-stop on all clients (default: enabled)
+  - When enabled: Playback stops automatically after 2 seconds even on clients without API support
+  - When disabled: Uses 1-hour dummy video (prevents "watched" status but requires manual stop)
+- **Playback Stop Delay (seconds)**: Delay before API stop command (default: 2 seconds, range: 0-30)
   - Increase if your client needs more time before playback can be stopped
   - Set to 0 for immediate stop (may not work on all clients)
 
@@ -398,7 +401,8 @@ Jellyfin.Plugin.JellyNext/
 │   ├── RecommendationsProvider.cs  # Trakt recommendations
 │   └── NextSeasonsProvider.cs    # Next season notifications
 ├── Resources/                    # Embedded resources
-│   └── dummy.mp4                 # FFprobe-compatible placeholder video
+│   ├── dummy.mp4                 # 1-hour FFprobe-compatible video (prevents "watched")
+│   └── dummy_short.mp4           # 2-second video (auto-stops playback)
 ├── ScheduledTasks/               # Background tasks
 │   └── ContentSyncScheduledTask.cs  # Periodic sync (6hr default)
 ├── Services/                     # Business logic
@@ -462,7 +466,8 @@ Contributions are welcome! Please:
 - **Extended Metadata**: Use `extended=full` on Trakt endpoints to get genre data for anime detection
 - **Token Refresh**: Trakt rotates refresh tokens on each refresh - always save new tokens
 - **TV Downloads**: Per-season monitoring (series monitored, but only specific season enabled)
-- **iOS/tvOS Fix**: Use dummy.mp4 to prevent FFprobe crashes on .strm files
+- **iOS/tvOS Fix**: Two dummy videos - short (2sec auto-stop) or long (1hr prevents "watched")
+- **Config Validation**: Stub files auto-rebuild when dummy video setting changes
 - **Jellyfin 10.11**: UserDataManager requires `User` entity (not Guid), use `IUserManager.GetUserById()`
 - **Framework**: .NET 9.0 required
 

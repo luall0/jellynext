@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.0.2.0
+
+### Features
+
+- **Short Dummy Video Option**: Added configurable 2-second dummy video for automatic playback stop on all clients
+  - New setting: `UseShortDummyVideo` (default: enabled)
+  - When enabled: Uses 2-second video that auto-stops playback even on clients without API support
+  - When disabled: Uses 1-hour video (prevents "watched" status but requires manual stop)
+  - Configurable via Dashboard → Plugins → JellyNext → Playback Settings
+  - New embedded resource: `dummy_short.mp4` (~5KB vs ~2MB for long version)
+
+### Improvements
+
+- **Automatic Stub Refresh on Config Change**: Virtual library stub files now automatically rebuild when dummy video setting is changed
+  - Validates stub file content matches current configuration on each sync
+  - Flushes and rebuilds directory if mismatch detected
+  - Ensures consistent experience across all virtual items
+- **Better Client Compatibility**: Short dummy video provides automatic stop on clients that don't support Jellyfin's playback control API
+
 ## v1.0.1.0
 
 ### Features

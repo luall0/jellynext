@@ -225,8 +225,10 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 
 ### FFprobe Compatibility (iOS/tvOS Fix)
 - **Problem**: iOS/tvOS probe .strm files with FFprobe → crash on invalid/empty files
-- **Solution**: Embed `dummy.mp4` (2x2, 1hr, ~2MB) as resource → extract to plugin data dir → point .strm files to it
-- **Why**: FFprobe succeeds on valid MP4, PlaybackInterceptor still detects by path pattern
-- **Side benefit**: 1-hour runtime prevents "watched" status (Jellyfin needs 5% = 3min)
+- **Solution**: Two embedded dummy videos:
+  - `dummy_short.mp4` (2x2, 2sec, ~5KB) - auto-stops playback on clients without API stop support
+  - `dummy.mp4` (2x2, 1hr, ~2MB) - prevents "watched" status (needs 5% = 3min), requires manual stop
+- **Configuration**: `UseShortDummyVideo` (default: true) - toggles between short/long dummy
+- **Auto-rebuild**: Changing config triggers full stub refresh via `DoesStubContentMatch()` check
 
 ---

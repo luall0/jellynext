@@ -19,12 +19,14 @@ public class VirtualLibraryManager
     private const string VirtualLibraryFolderName = "jellynext-virtual";
     private const string StubFileExtension = ".strm";
     private const string DummyVideoFileName = "dummy.mp4";
+    private const string DummyVideoShortFileName = "dummy_short.mp4";
     private const string KeepFileName = ".keep";
 
     private readonly ContentCacheService _cacheService;
     private readonly ILogger<VirtualLibraryManager> _logger;
     private string? _virtualLibraryPath;
     private string? _dummyVideoPath;
+    private string? _dummyVideoShortPath;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualLibraryManager"/> class.
@@ -63,8 +65,9 @@ public class VirtualLibraryManager
             // Migrate old structure (clean up old .strm files in root)
             MigrateOldStructure();
 
-            // Create dummy video file for FFprobe compatibility
+            // Create dummy video files for FFprobe compatibility
             CreateDummyVideo();
+            CreateDummyVideoShort();
 
             // Log setup instructions for each user
             LogSetupInstructions();
@@ -126,6 +129,60 @@ public class VirtualLibraryManager
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not extract dummy video file - .strm files will use fallback URL");
+        }
+    }
+
+    private void CreateDummyVideoShort()
+    {
+        if (string.IsNullOrEmpty(_virtualLibraryPath))
+        {
+            return;
+        }
+
+        try
+        {
+            _dummyVideoShortPath = Path.Combine(_virtualLibraryPath, DummyVideoShortFileName);
+
+            // Only create if it doesn't exist
+            if (File.Exists(_dummyVideoShortPath))
+            {
+                _logger.LogDebug("Short dummy video already exists: {Path}", _dummyVideoShortPath);
+                return;
+            }
+
+            // Extract embedded short dummy video from resources
+            var assembly = typeof(VirtualLibraryManager).Assembly;
+            var resourceName = $"{assembly.GetName().Name}.Resources.{DummyVideoShortFileName}";
+
+            _logger.LogInformation("Extracting embedded short dummy video from resources...");
+
+            using (var resourceStream = assembly.GetManifestResourceStream(resourceName))
+            {
+                if (resourceStream == null)
+                {
+                    _logger.LogWarning("Embedded short dummy video not found in resources: {ResourceName}", resourceName);
+                    return;
+                }
+
+                using (var fileStream = File.Create(_dummyVideoShortPath))
+                {
+                    resourceStream.CopyTo(fileStream);
+                }
+            }
+
+            if (File.Exists(_dummyVideoShortPath))
+            {
+                var fileSize = new FileInfo(_dummyVideoShortPath).Length;
+                _logger.LogInformation("Extracted short dummy video file: {Path} (size: {Size} bytes)", _dummyVideoShortPath, fileSize);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to extract short dummy video file");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not extract short dummy video file - will use regular dummy video as fallback");
         }
     }
 
@@ -332,6 +389,15 @@ public class VirtualLibraryManager
     private void RefreshMovieStubFiles(string userPath, List<ContentItem> items)
     {
         var existingFiles = Directory.GetFiles(userPath, $"*{StubFileExtension}");
+
+        // Check if stub file content matches current configuration
+        if (existingFiles.Length > 0 && !DoesStubContentMatch(existingFiles[0]))
+        {
+            _logger.LogInformation("Stub file content doesn't match current configuration, flushing directory: {Path}", userPath);
+            FlushDirectory(userPath);
+            existingFiles = Array.Empty<string>();
+        }
+
         var currentTmdbIds = items.Select(m => m.TmdbId!.Value).ToHashSet();
 
         CleanOldMovieStubFiles(existingFiles, currentTmdbIds);
@@ -377,6 +443,19 @@ public class VirtualLibraryManager
     private void RefreshShowStubFiles(string userPath, List<ContentItem> items, VirtualLibraryContentType contentType, Guid userId)
     {
         var existingDirs = Directory.GetDirectories(userPath);
+
+        // Check if stub file content matches current configuration
+        if (existingDirs.Length > 0)
+        {
+            var firstShowStubs = Directory.GetFiles(existingDirs[0], $"*{StubFileExtension}");
+            if (firstShowStubs.Length > 0 && !DoesStubContentMatch(firstShowStubs[0]))
+            {
+                _logger.LogInformation("Stub file content doesn't match current configuration, flushing directory: {Path}", userPath);
+                FlushDirectory(userPath);
+                existingDirs = Array.Empty<string>();
+            }
+        }
+
         var currentTvdbIds = items.Select(s => s.TvdbId!.Value).ToHashSet();
 
         CleanOldShowFolders(existingDirs, currentTvdbIds);
@@ -515,6 +594,15 @@ public class VirtualLibraryManager
 
     private string GetStubFileContent(string placeholderType)
     {
+        var config = Plugin.Instance?.Configuration;
+        var useShortDummy = config?.UseShortDummyVideo ?? true;
+
+        // Use short dummy if enabled and available, otherwise fall back to regular dummy
+        if (useShortDummy && !string.IsNullOrEmpty(_dummyVideoShortPath) && File.Exists(_dummyVideoShortPath))
+        {
+            return _dummyVideoShortPath;
+        }
+
         if (!string.IsNullOrEmpty(_dummyVideoPath) && File.Exists(_dummyVideoPath))
         {
             return _dummyVideoPath;
@@ -605,6 +693,71 @@ public class VirtualLibraryManager
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Checks if stub file content matches the current configuration.
+    /// </summary>
+    /// <param name="stubFilePath">Path to a stub file to check.</param>
+    /// <returns>True if the content matches current configuration, false otherwise.</returns>
+    private bool DoesStubContentMatch(string stubFilePath)
+    {
+        try
+        {
+            if (!File.Exists(stubFilePath))
+            {
+                return false;
+            }
+
+            var currentContent = File.ReadAllText(stubFilePath).Trim();
+            var expectedContent = GetStubFileContent("check");
+
+            return currentContent == expectedContent;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error checking stub file content: {Path}", stubFilePath);
+            return true; // Assume match on error to avoid unnecessary rebuilds
+        }
+    }
+
+    /// <summary>
+    /// Flushes all files and subdirectories in a directory, keeping only the .keep file.
+    /// </summary>
+    /// <param name="directoryPath">The directory to flush.</param>
+    private void FlushDirectory(string directoryPath)
+    {
+        try
+        {
+            if (!Directory.Exists(directoryPath))
+            {
+                return;
+            }
+
+            // Delete all subdirectories
+            foreach (var dir in Directory.GetDirectories(directoryPath))
+            {
+                Directory.Delete(dir, recursive: true);
+                _logger.LogDebug("Deleted directory: {Dir}", dir);
+            }
+
+            // Delete all files except .keep
+            foreach (var file in Directory.GetFiles(directoryPath))
+            {
+                var fileName = Path.GetFileName(file);
+                if (fileName != KeepFileName)
+                {
+                    File.Delete(file);
+                    _logger.LogDebug("Deleted file: {File}", file);
+                }
+            }
+
+            _logger.LogInformation("Flushed directory: {Path}", directoryPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error flushing directory: {Path}", directoryPath);
+        }
     }
 
     private static string SanitizeFilename(string filename)

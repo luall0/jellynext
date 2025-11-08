@@ -77,6 +77,14 @@ public class PluginConfiguration : BasePluginConfiguration
     public int PlaybackStopDelaySeconds { get; set; } = 2;
 
     /// <summary>
+    /// Gets or sets a value indicating whether to use short (2-second) dummy video for virtual items.
+    /// When enabled, playback stops automatically after 2 seconds.
+    /// When disabled, uses 1-hour dummy video (prevents "watched" status but requires manual stop on some clients).
+    /// Default: true (enabled).
+    /// </summary>
+    public bool UseShortDummyVideo { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets the array of per-user Trakt configurations.
     /// </summary>
     public TraktUser[] TraktUsers { get; set; } = Array.Empty<TraktUser>();
