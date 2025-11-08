@@ -20,7 +20,7 @@ CHANGELOG="${CHANGELOG_CONTENT}"
 JSON_PAYLOAD=$(jq -n \
   --arg guid "$GUID" \
   --arg checksum "$CHECKSUM" \
-  --arg changelog "$CHANGELOG" \
+  --arg changelog $CHANGELOG \
   --arg targetAbi "$TARGET_ABI" \
   --arg sourceUrl "$SOURCE_URL" \
   --arg version "$VERSION" \
