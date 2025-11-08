@@ -36,6 +36,19 @@ jobs:
           cd Jellyfin.Plugin.JellyNext/bin/Release/net9.0
           zip -r ../../../../jellynext-v${{ steps.version.outputs.version }}.zip *
 
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHANGELOG=$(sed -n "/## v${VERSION}/,/## v/p" CHANGELOG.md | sed '1!{/## v/d;}' | sed '1d')
+          if [ -z "$CHANGELOG" ]; then
+            echo "No changelog found for version ${VERSION}"
+            CHANGELOG="Release v${VERSION}"
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -48,6 +61,7 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Jellynext ${{ steps.version.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
           files: jellynext-v${{ steps.version.outputs.version }}.zip
           draft: false
           prerelease: false
