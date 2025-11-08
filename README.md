@@ -73,7 +73,21 @@ Features:
 
 ### Install from Repository
 
-*Plugin repository coming soon*
+1. **Add Plugin Repository to Jellyfin**
+   - Go to: **Dashboard → Plugins → Repositories**
+   - Click **"+"** to add a new repository
+   - Enter repository URL: `https://raw.githubusercontent.com/luall0/jellyfin-luall0-plugins/refs/heads/main/manifest.json`
+   - Click **Save**
+
+2. **Install JellyNext Plugin**
+   - Go to: **Dashboard → Plugins → Catalog**
+   - Find **"JellyNext"** in the list
+   - Click **Install**
+   - Restart Jellyfin when prompted
+
+3. **Verify Installation**
+   - After restart, go to: **Dashboard → Plugins**
+   - **JellyNext** should appear in your installed plugins list
 
 ### Manual Installation
 
