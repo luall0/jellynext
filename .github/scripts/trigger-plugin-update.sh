@@ -9,11 +9,11 @@ GUID="$1"
 CHECKSUM="$2"
 TARGET_ABI="$3"
 SOURCE_URL="$4"
-VERSION="$5"
-PAT_TOKEN="$6"
+CHANGELOG=$5
+VERSION="$6"
+PAT_TOKEN="$7"
 
 # Changelog comes from environment variable to avoid shell escaping issues
-CHANGELOG="${CHANGELOG_CONTENT}"
 
 JSON_PAYLOAD=$(cat <<EOF
 {
@@ -29,6 +29,8 @@ JSON_PAYLOAD=$(cat <<EOF
 }
 EOF
 )
+
+echo $JSON_PAYLOAD
 
 # Send the API request
 curl -X POST \
