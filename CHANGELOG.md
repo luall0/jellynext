@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.0.2
+
+### Documentation
+
+- **Enhanced Setup Instructions**: Added detailed virtual library path discovery instructions
+  - Included example log output showing exact paths for each content type
+  - Clarified Docker path usage (`/config/data/plugins/Jellyfin.Plugin.JellyNext/jellynext-virtual/...`)
+  - Added step-by-step guide for finding jellynext-virtual directory via Jellyfin logs after Trakt user configuration
+  - Improved user experience for first-time setup
+
 ## v1.1.0.1
 
 ### Bug Fixes

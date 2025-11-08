@@ -201,8 +201,38 @@ For each user who will use JellyNext, create three Jellyfin libraries pointing t
 - Or check filesystem after first sync: `/jellyfin/data/jellynext-virtual/` will contain user folders
 
 **Important Notes:**
+- If you can't find the jellynext-virtual directory, restart your jellyfin instance after configuring your trakt user it will display all path used for each users.
+```
+VirtualLibraryManager: ================================================================================
+VirtualLibraryManager: JellyNext Virtual Libraries Initialized
+VirtualLibraryManager: ================================================================================
+VirtualLibraryManager: IMPORTANT: Each content type is a SEPARATE library in Jellyfin
+VirtualLibraryManager: (e.g., "admin's Movies Recommendations", "admin's Shows Recommendations")
+VirtualLibraryManager: ================================================================================
+VirtualLibraryManager: User ID: 8ed9b676-f57a-4483-8def-f36d0515de83
+VirtualLibraryManager:   [1] Movie Recommendations:
+VirtualLibraryManager:       Path: /config/plugins/Jellyfin.Plugin.JellyNext/jellynext-virtual/8ed9b676-f57a-4483-8def-f36d0515de83/movies_recommendations
+VirtualLibraryManager:       Library Type: Movies
+VirtualLibraryManager:       Suggested Name: "[Your Username]'s Movies Recommendations"
+VirtualLibraryManager:   [2] Show Recommendations:
+VirtualLibraryManager:       Path: /config/plugins/Jellyfin.Plugin.JellyNext/jellynext-virtual/8ed9b676-f57a-4483-8def-f36d0515de83/shows_recommendations
+VirtualLibraryManager:       Library Type: Shows
+VirtualLibraryManager:       Suggested Name: "[Your Username]'s Shows Recommendations"
+VirtualLibraryManager:   [3] Next Seasons:
+VirtualLibraryManager:       Path: /config/plugins/Jellyfin.Plugin.JellyNext/jellynext-virtual/8ed9b676-f57a-4483-8def-f36d0515de83/shows_nextseasons
+VirtualLibraryManager:       Library Type: Shows
+VirtualLibraryManager:       Suggested Name: "[Your Username]'s Next Seasons"
+VirtualLibraryManager:   Setup Instructions:
+VirtualLibraryManager:     1. Go to Jellyfin Dashboard → Libraries → Add Media Library
+VirtualLibraryManager:     2. For EACH content type above, create a SEPARATE library:
+VirtualLibraryManager:        - Select content type (Movies or Shows)
+VirtualLibraryManager:        - Add the folder path shown above
+VirtualLibraryManager:        - Use the suggested library name
+VirtualLibraryManager:     3. This allows you to have separate libraries per recommendation type
+VirtualLibraryManager: --------------------------------------------------------------------------------
+```
 - Use the full absolute path to your Jellyfin data directory
-- Docker users: Use the container's internal path (e.g., `/config/data/jellynext-virtual/...`)
+- Docker users: Use the container's internal path (e.g., `/config/data/plugins/Jellyfin.Plugin.JellyNext/jellynext-virtual/...`)
 - Library names can be customized, but folders must match exactly
 - Set library permissions so the user can access only their own virtual libraries
 
