@@ -102,6 +102,20 @@ public class PlaybackInterceptor : IHostedService
                 itemUserId = e.Session.UserId;
             }
 
+            // Determine if this is a movie or show based on path
+            if (e.Item.Path.Contains("movies_", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleMovieDownload(e, itemUserId);
+            }
+            else if (e.Item.Path.Contains("shows_", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleShowDownload(e, itemUserId);
+            }
+            else
+            {
+                _logger.LogWarning("Unknown content type in virtual item path: {Path}", e.Item.Path);
+            }
+
             // Stop playback immediately
             try
             {
@@ -118,20 +132,6 @@ public class PlaybackInterceptor : IHostedService
             catch (Exception stopEx)
             {
                 _logger.LogWarning(stopEx, "Could not stop playback session");
-            }
-
-            // Determine if this is a movie or show based on path
-            if (e.Item.Path.Contains("movies_", StringComparison.OrdinalIgnoreCase))
-            {
-                await HandleMovieDownload(e, itemUserId);
-            }
-            else if (e.Item.Path.Contains("shows_", StringComparison.OrdinalIgnoreCase))
-            {
-                await HandleShowDownload(e, itemUserId);
-            }
-            else
-            {
-                _logger.LogWarning("Unknown content type in virtual item path: {Path}", e.Item.Path);
             }
         }
         catch (Exception ex)

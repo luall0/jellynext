@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.0.1
+
+### Bug Fixes
+
+- **Sonarr Integration**: Fix series monitoring update failure caused by missing `path` field in API requests
+
 ## v1.0.0.0
 
 ### Features

@@ -33,10 +33,16 @@ public class SonarrSeries
     public int QualityProfileId { get; set; }
 
     /// <summary>
-    /// Gets or sets the root folder path.
+    /// Gets or sets the root folder path (used when adding new series).
     /// </summary>
     [JsonPropertyName("rootFolderPath")]
     public string RootFolderPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the full path where the series is stored (required for updates).
+    /// </summary>
+    [JsonPropertyName("path")]
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets a value indicating whether the series is monitored.
