@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.1.0.0
+
+### Features
+
+- **Trending Movies (Global)**: Added global trending movies feature visible to all users
+  - New global content type: `MoviesTrending`
+  - Non-personalized trending movies from Trakt
+  - Configurable via Dashboard → Plugins → JellyNext → Trending Movies (Global)
+  - Settings:
+    - Enable/disable toggle
+    - Source user selection (which Trakt account to use for API access)
+    - Limit: 1-100 movies (default: 50)
+  - Virtual library path: `jellynext-virtual/global/movies_trending`
+  - Directory automatically created on plugin startup when enabled
+  - Supports same one-click Radarr download functionality as per-user recommendations
+
+### Improvements
+
+- **Global Content Architecture**: Extended virtual library system to support both per-user and global content types
+  - New helper method: `VirtualLibraryContentTypeHelper.IsGlobal()` to distinguish content types
+  - `VirtualLibraryManager` now handles both per-user (`jellynext-virtual/[userId]/[content-type]/`) and global (`jellynext-virtual/global/[content-type]/`) paths
+  - Automatic directory initialization for global content types
+  - Setup instructions now include global libraries when enabled
+- **Trakt API**: Added `GetTrendingMovies()` method to fetch trending movies with configurable limits
+- **New Provider**: `TrendingMoviesProvider` implements `IContentProvider` for modular trending movies support
+- **Documentation**: Updated CLAUDE.md and README.md with global content architecture and trending movies feature
+
 ## v1.0.3.0
 
 ### Features

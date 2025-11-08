@@ -147,6 +147,49 @@
                         </div>
                     </div>
 
+                    <!-- Trending Movies Settings -->
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Trending Movies (Global)</h3>
+                        <div class="fieldDescription" style="margin-bottom: 1em;">
+                            Configure global trending movies that appear for all users.
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="TrendingMoviesEnabled" />
+                                <span>Enable Trending Movies</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">
+                                Show trending movies in a global library (not per-user)
+                            </div>
+                        </div>
+
+                        <div id="TrendingMoviesOptions" style="display: none; margin-top: 1em;">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="TrendingMoviesUser">Source User:</label>
+                                <select is="emby-select" id="TrendingMoviesUser" name="TrendingMoviesUser">
+                                    <option value="">Select user for Trakt access...</option>
+                                </select>
+                                <div class="fieldDescription">
+                                    Which user's Trakt account to use for fetching trending movies
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="TrendingMoviesLimit">Trending Movies Limit:</label>
+                                <input is="emby-input" type="number" id="TrendingMoviesLimit" name="TrendingMoviesLimit" min="1" max="100" />
+                                <div class="fieldDescription">
+                                    Number of trending movies to fetch (1-100, default: 50)
+                                </div>
+                            </div>
+
+                            <div class="fieldDescription" style="margin-top: 1em; padding: 0.75em; background-color: rgba(0, 164, 220, 0.1); border-left: 3px solid #00a4dc;">
+                                <strong>Library Setup:</strong> After enabling, add a Jellyfin library pointing to:<br>
+                                <code style="background-color: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">jellynext-virtual/global/movies_trending</code>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Radarr Settings -->
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Radarr Settings</h3>
@@ -315,6 +358,12 @@
                         userSelector.appendChild(option);
                     });
                 });
+            }
+
+            // Update trending movies options visibility based on enabled checkbox
+            function updateTrendingOptionsVisibility() {
+                var enabled = document.getElementById('TrendingMoviesEnabled').checked;
+                document.getElementById('TrendingMoviesOptions').style.display = enabled ? 'block' : 'none';
             }
 
             // Check authorization status for selected user
@@ -510,6 +559,11 @@
                     clearInterval(JellyNextConfig.authCheckInterval);
                 }
                 checkAuthorizationStatus(userGuid);
+            });
+
+            // Trending movies enabled checkbox
+            document.getElementById('TrendingMoviesEnabled').addEventListener('change', function () {
+                updateTrendingOptionsVisibility();
             });
 
             // Test Radarr connection
@@ -711,6 +765,29 @@
                     document.getElementById('PlaybackStopDelaySeconds').value = config.PlaybackStopDelaySeconds !== undefined ? config.PlaybackStopDelaySeconds : 2;
                     document.getElementById('UseShortDummyVideo').checked = config.UseShortDummyVideo !== false;
 
+                    // Load trending movies configuration
+                    document.getElementById('TrendingMoviesEnabled').checked = config.TrendingMoviesEnabled || false;
+                    document.getElementById('TrendingMoviesLimit').value = config.TrendingMoviesLimit || 50;
+
+                    // Load users for trending dropdown
+                    ApiClient.getUsers().then(function (users) {
+                        var trendingUserSelect = document.getElementById('TrendingMoviesUser');
+                        trendingUserSelect.innerHTML = '<option value="">Select user for Trakt access...</option>';
+
+                        users.forEach(function (user) {
+                            var option = document.createElement('option');
+                            option.value = user.Id;
+                            option.textContent = user.Name;
+                            if (config.TrendingMoviesUserId && config.TrendingMoviesUserId === user.Id) {
+                                option.selected = true;
+                            }
+                            trendingUserSelect.appendChild(option);
+                        });
+                    });
+
+                    // Show/hide trending options based on enabled state
+                    updateTrendingOptionsVisibility();
+
                     // If Radarr is configured, show a hint to test connection to see options
                     if (config.RadarrUrl && config.RadarrApiKey) {
                         if (config.RadarrQualityProfileId && config.RadarrRootFolderPath) {
@@ -773,6 +850,11 @@
                     config.EndedShowsCacheExpirationDays = parseInt(document.getElementById('EndedShowsCacheExpirationDays').value);
                     config.PlaybackStopDelaySeconds = parseInt(document.getElementById('PlaybackStopDelaySeconds').value);
                     config.UseShortDummyVideo = document.getElementById('UseShortDummyVideo').checked;
+
+                    // Save trending movies configuration
+                    config.TrendingMoviesEnabled = document.getElementById('TrendingMoviesEnabled').checked;
+                    config.TrendingMoviesUserId = document.getElementById('TrendingMoviesUser').value || '';
+                    config.TrendingMoviesLimit = parseInt(document.getElementById('TrendingMoviesLimit').value) || 50;
 
                     ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);

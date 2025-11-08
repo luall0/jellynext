@@ -27,6 +27,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         // Content providers
         serviceCollection.AddSingleton<IContentProvider, RecommendationsProvider>();
         serviceCollection.AddSingleton<IContentProvider, NextSeasonsProvider>();
+        serviceCollection.AddSingleton<IContentProvider, TrendingMoviesProvider>();
 
         // Sync service (must be registered after providers)
         serviceCollection.AddSingleton<ContentSyncService>();

@@ -28,5 +28,10 @@ public enum VirtualLibraryContentType
     /// <summary>
     /// Next seasons of watched shows.
     /// </summary>
-    ShowsNextSeasons
+    ShowsNextSeasons,
+
+    /// <summary>
+    /// Trending movies (global, not per-user).
+    /// </summary>
+    MoviesTrending
 }

@@ -27,6 +27,7 @@ JellyNext is designed to work alongside the [official Jellyfin Trakt plugin](htt
   - `Trakt Movie Recommendations`
   - `Trakt Show Recommendations`
   - `Trakt Next Seasons`
+  - `Trending Movies` (if enabled)
 - This prevents playback attempts on virtual items from being marked as "watched" on Trakt
 - Your real media libraries can still sync normally with the official plugin
 
@@ -39,14 +40,18 @@ JellyNext is designed to work alongside the [official Jellyfin Trakt plugin](htt
 - **Privacy-Focused**: Each user's recommendations are based on their own Trakt watch history
 
 ### 📚 Virtual Libraries
-Three dedicated virtual libraries per user:
+**Per-User Libraries:**
 - **Trakt Movie Recommendations**: Personalized movie suggestions based on your Trakt history
 - **Trakt Show Recommendations**: TV show suggestions (configurable to show only season 1 or all seasons)
 - **Trakt Next Seasons**: Smart notifications for the immediate next unwatched season of shows you're following
 
+**Global Libraries (shared across all users):**
+- **Trending Movies**: Current trending movies on Trakt (non-personalized)
+
 Features:
 - Automatic sync on configurable interval (default: 6 hours)
 - Smart filtering: exclude already collected items, optionally exclude watchlisted items
+- Configurable limits: 1-100 items per recommendation type
 - Ended/canceled shows cache (reduces API calls for shows that won't get new seasons)
 - iOS/tvOS compatible (uses FFprobe-compatible dummy video files)
 

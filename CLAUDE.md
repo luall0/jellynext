@@ -51,8 +51,8 @@ Jellyfin.Plugin.JellyNext/
 ```
 
 ### Key Components
-- **Content Providers** (`IContentProvider`): Modular sources (RecommendationsProvider, NextSeasonsProvider)
-- **Virtual Libraries**: Per-user .strm stub files (`jellynext-virtual/[userId]/[content-type]/`)
+- **Content Providers** (`IContentProvider`): Modular sources (RecommendationsProvider, NextSeasonsProvider, TrendingMoviesProvider)
+- **Virtual Libraries**: Per-user .strm stub files (`jellynext-virtual/[userId]/[content-type]/`) + global content (`jellynext-virtual/global/[content-type]/`)
 - **Playback Interception**: Detects virtual item playback, triggers Radarr/Sonarr downloads
 - **OAuth**: Per-user Trakt tokens with auto-refresh (stored in `PluginConfiguration.TraktUsers[]`)
 - **Sync System**: `ContentSyncScheduledTask` + `StartupSyncService` → cache → .strm files → library scan
@@ -85,7 +85,7 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `JellyNextLibraryController.cs`: Query cached content (recommendations, next seasons)
 
 **Services** (`/Services/`):
-- `TraktApi.cs`: Trakt API client (OAuth, recommendations, watchlist, watched progress)
+- `TraktApi.cs`: Trakt API client (OAuth, recommendations, trending, watchlist, watched progress)
 - `ContentCacheService.cs`: In-memory cache (per-user, per-provider, 6hr expiration)
 - `EndedShowsCacheService.cs`: Cross-user cache for ended/canceled shows (7 day default expiration, configurable)
 - `ContentSyncService.cs`: Sync orchestrator (iterates users/providers, updates cache/virtual library, cleans expired shows)
@@ -98,12 +98,13 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `IContentProvider.cs`: Interface (ProviderName, LibraryName, FetchContentAsync, IsEnabledForUser)
 - `RecommendationsProvider.cs`: Fetches Trakt recommendations, uses ended shows cache to skip season API calls for ended/canceled shows
 - `NextSeasonsProvider.cs`: Fetches immediate next unwatched season, uses ended shows cache to skip re-checking completed shows
+- `TrendingMoviesProvider.cs`: Fetches Trakt trending movies (global, not per-user)
 
 **Virtual Library** (`/VirtualLibrary/`):
-- `VirtualLibraryManager.cs`: Stub file creation/management, dummy.mp4 extraction, .keep file maintenance
+- `VirtualLibraryManager.cs`: Stub file creation/management, dummy.mp4 extraction, .keep file maintenance, global content support
 - `VirtualLibraryCreator.cs`: Initialization wrapper
-- `VirtualLibraryContentType.cs`: Enum (MoviesRecommendations, ShowsRecommendations, etc.)
-- `VirtualLibraryContentTypeHelper.cs`: Maps content types to directories/providers/display names
+- `VirtualLibraryContentType.cs`: Enum (MoviesRecommendations, ShowsRecommendations, MoviesTrending, etc.)
+- `VirtualLibraryContentTypeHelper.cs`: Maps content types to directories/providers/display names, `IsGlobal()` helper
 
 **Jellyfin Integration**:
 - `ScheduledTasks/ContentSyncScheduledTask.cs`: IScheduledTask (6hr interval, calls ContentSyncService, triggers library scan)
@@ -214,7 +215,9 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 `StartupSyncService` (IHostedService) programmatically executes `ContentSyncScheduledTask` via `ITaskManager` - more reliable than `TriggerStartup` (only works on first registration)
 
 ### Virtual Library Stub Files
-- **Path structure**: `jellynext-virtual/[userId]/[content-type]/`
+- **Path structure**:
+  - Per-user: `jellynext-virtual/[userId]/[content-type]/`
+  - Global: `jellynext-virtual/global/[content-type]/`
 - **Empty dirs**: Maintain `.keep` files (Jellyfin won't scan empty directories)
 - **File formats**:
   - Movies: `Title (Year) [tmdbid-ID].strm`
@@ -223,6 +226,13 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
   - Path: `jellynext-virtual[/\\]([a-f0-9-]+)[/\\]([^/\\]+)[/\\]` (userId + content type)
   - Movie: `\[tmdbid-(\d+)\]$` | Show: `\[tvdbid-(\d+)\]$`
 - **Native Resolution**: Jellyfin's default resolvers handle stub files automatically via standard naming conventions (`[tmdbid-X]` / `[tvdbid-X]` tags), no custom resolver needed
+
+### Global Content Types
+- **Purpose**: Shared content across all users (e.g., trending movies)
+- **Configuration**: Global settings in `PluginConfiguration` (not per-user)
+- **Path**: `jellynext-virtual/global/movies_trending`
+- **Source User**: Requires one Trakt-authenticated user for API access (`TrendingMoviesUserId`)
+- **Auto-initialization**: Directory created on plugin startup if enabled (`InitializeGlobalDirectories()`)
 
 ### FFprobe Compatibility (iOS/tvOS Fix)
 - **Problem**: iOS/tvOS probe .strm files with FFprobe → crash on invalid/empty files

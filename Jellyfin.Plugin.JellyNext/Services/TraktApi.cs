@@ -392,4 +392,38 @@ public class TraktApi
 
         return seasons ?? Array.Empty<TraktSeason>();
     }
+
+    /// <summary>
+    /// Gets trending movies.
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration (for auth).</param>
+    /// <param name="limit">Maximum number of trending movies to return (default: 10, max: 100).</param>
+    /// <returns>List of trending movies.</returns>
+    public async Task<TraktMovie[]> GetTrendingMovies(TraktUser traktUser, int limit = 10)
+    {
+        var queryParams = $"?limit={limit}&extended=full";
+
+        using var httpClient = await CreateTraktClient(traktUser);
+        var response = await httpClient.GetAsync($"/movies/trending{queryParams}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError(
+                "Failed to get trending movies: Status={Status}, Content={Content}",
+                response.StatusCode,
+                errorContent);
+            return Array.Empty<TraktMovie>();
+        }
+
+        // Trending endpoint returns an array of objects with a "movie" property
+        var trendingItems = await response.Content.ReadFromJsonAsync<TraktTrendingMovieItem[]>(_jsonOptions);
+        if (trendingItems == null)
+        {
+            return Array.Empty<TraktMovie>();
+        }
+
+        // Extract the movie objects from the trending items
+        return trendingItems.Select(item => item.Movie).ToArray();
+    }
 }

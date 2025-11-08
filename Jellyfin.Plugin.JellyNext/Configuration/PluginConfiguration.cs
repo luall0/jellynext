@@ -85,6 +85,21 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool UseShortDummyVideo { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets a value indicating whether trending movies feature is enabled.
+    /// </summary>
+    public bool TrendingMoviesEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the user GUID from which to fetch trending movies.
+    /// </summary>
+    public Guid TrendingMoviesUserId { get; set; } = Guid.Empty;
+
+    /// <summary>
+    /// Gets or sets the limit for trending movies (1-100, default: 50).
+    /// </summary>
+    public int TrendingMoviesLimit { get; set; } = 50;
+
+    /// <summary>
     /// Gets or sets the array of per-user Trakt configurations.
     /// </summary>
     public TraktUser[] TraktUsers { get; set; } = Array.Empty<TraktUser>();

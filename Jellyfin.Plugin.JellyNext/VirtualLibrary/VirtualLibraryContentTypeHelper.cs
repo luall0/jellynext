@@ -19,6 +19,7 @@ public static class VirtualLibraryContentTypeHelper
             VirtualLibraryContentType.WatchlistMovies => "watchlist_movies",
             VirtualLibraryContentType.WatchlistShows => "watchlist_shows",
             VirtualLibraryContentType.ShowsNextSeasons => "shows_nextseasons",
+            VirtualLibraryContentType.MoviesTrending => "movies_trending",
             _ => throw new System.ArgumentOutOfRangeException(nameof(contentType), contentType, null)
         };
     }
@@ -37,6 +38,7 @@ public static class VirtualLibraryContentTypeHelper
             VirtualLibraryContentType.WatchlistMovies => "watchlist",
             VirtualLibraryContentType.WatchlistShows => "watchlist",
             VirtualLibraryContentType.ShowsNextSeasons => "nextseasons",
+            VirtualLibraryContentType.MoviesTrending => "trending",
             _ => throw new System.ArgumentOutOfRangeException(nameof(contentType), contentType, null)
         };
     }
@@ -55,6 +57,7 @@ public static class VirtualLibraryContentTypeHelper
             VirtualLibraryContentType.WatchlistMovies => "Movie Watchlist",
             VirtualLibraryContentType.WatchlistShows => "Show Watchlist",
             VirtualLibraryContentType.ShowsNextSeasons => "Next Seasons",
+            VirtualLibraryContentType.MoviesTrending => "Trending Movies",
             _ => throw new System.ArgumentOutOfRangeException(nameof(contentType), contentType, null)
         };
     }
@@ -73,6 +76,7 @@ public static class VirtualLibraryContentTypeHelper
             VirtualLibraryContentType.WatchlistMovies => "Movies",
             VirtualLibraryContentType.WatchlistShows => "Shows",
             VirtualLibraryContentType.ShowsNextSeasons => "Shows",
+            VirtualLibraryContentType.MoviesTrending => "Movies",
             _ => throw new System.ArgumentOutOfRangeException(nameof(contentType), contentType, null)
         };
     }
@@ -92,9 +96,24 @@ public static class VirtualLibraryContentTypeHelper
             "watchlist_movies" => VirtualLibraryContentType.WatchlistMovies,
             "watchlist_shows" => VirtualLibraryContentType.WatchlistShows,
             "shows_nextseasons" => VirtualLibraryContentType.ShowsNextSeasons,
+            "movies_trending" => VirtualLibraryContentType.MoviesTrending,
             _ => default
         };
 
-        return directoryName is "movies_recommendations" or "shows_recommendations" or "watchlist_movies" or "watchlist_shows" or "shows_nextseasons";
+        return directoryName is "movies_recommendations" or "shows_recommendations" or "watchlist_movies" or "watchlist_shows" or "shows_nextseasons" or "movies_trending";
+    }
+
+    /// <summary>
+    /// Checks if a content type is global (not per-user).
+    /// </summary>
+    /// <param name="contentType">The content type.</param>
+    /// <returns>True if the content type is global, false if it's per-user.</returns>
+    public static bool IsGlobal(VirtualLibraryContentType contentType)
+    {
+        return contentType switch
+        {
+            VirtualLibraryContentType.MoviesTrending => true,
+            _ => false
+        };
     }
 }

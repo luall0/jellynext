@@ -69,6 +69,9 @@ public class VirtualLibraryManager
             CreateDummyVideo();
             CreateDummyVideoShort();
 
+            // Initialize global directories if enabled
+            InitializeGlobalDirectories();
+
             // Log setup instructions for each user
             LogSetupInstructions();
         }
@@ -186,6 +189,36 @@ public class VirtualLibraryManager
         }
     }
 
+    private void InitializeGlobalDirectories()
+    {
+        if (string.IsNullOrEmpty(_virtualLibraryPath))
+        {
+            _logger.LogWarning("Virtual library path not initialized, cannot create global directories");
+            return;
+        }
+
+        try
+        {
+            var config = Plugin.Instance?.Configuration;
+            if (config == null)
+            {
+                return;
+            }
+
+            // Create trending movies directory if enabled
+            if (config.TrendingMoviesEnabled)
+            {
+                var trendingPath = GetGlobalLibraryPath(VirtualLibraryContentType.MoviesTrending);
+                EnsureDirectoryExists(trendingPath);
+                _logger.LogInformation("Initialized global trending movies directory: {Path}", trendingPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error initializing global directories");
+        }
+    }
+
     private void MigrateOldStructure()
     {
         if (string.IsNullOrEmpty(_virtualLibraryPath))
@@ -281,6 +314,21 @@ public class VirtualLibraryManager
             _logger.LogInformation("--------------------------------------------------------------------------------");
         }
 
+        // Show global content types if enabled
+        if (config.TrendingMoviesEnabled)
+        {
+            _logger.LogInformation(" ");
+            _logger.LogInformation("GLOBAL CONTENT (visible to all users):");
+            _logger.LogInformation("--------------------------------------------------------------------------------");
+
+            var trendingPath = GetGlobalLibraryPath(VirtualLibraryContentType.MoviesTrending);
+            _logger.LogInformation("  [Global] Trending Movies:");
+            _logger.LogInformation("      Path: {Path}", trendingPath);
+            _logger.LogInformation("      Library Type: Movies");
+            _logger.LogInformation("      Suggested Name: \"Trending Movies\"");
+            _logger.LogInformation("--------------------------------------------------------------------------------");
+        }
+
         _logger.LogInformation("================================================================================");
     }
 
@@ -312,6 +360,12 @@ public class VirtualLibraryManager
                 RefreshStubFilesForUser(userId, VirtualLibraryContentType.ShowsRecommendations);
                 RefreshStubFilesForUser(userId, VirtualLibraryContentType.ShowsNextSeasons);
                 // Future: Add watchlist content types here
+            }
+
+            // Refresh global content types
+            if (config.TrendingMoviesEnabled && config.TrendingMoviesUserId != Guid.Empty)
+            {
+                RefreshGlobalStubFiles(VirtualLibraryContentType.MoviesTrending);
             }
 
             _logger.LogInformation("Stub file refresh complete for all users");
@@ -360,6 +414,76 @@ public class VirtualLibraryManager
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error refreshing stub files for user {UserId}", userId);
+        }
+    }
+
+    /// <summary>
+    /// Refreshes stub files for a global content type.
+    /// </summary>
+    /// <param name="contentType">The content type.</param>
+    public void RefreshGlobalStubFiles(VirtualLibraryContentType contentType)
+    {
+        try
+        {
+            if (!VirtualLibraryContentTypeHelper.IsGlobal(contentType))
+            {
+                _logger.LogWarning("Content type {ContentType} is not global, skipping", contentType);
+                return;
+            }
+
+            var config = Plugin.Instance?.Configuration;
+            if (config == null)
+            {
+                return;
+            }
+
+            // For trending movies, use the configured user ID
+            Guid userId;
+            if (contentType == VirtualLibraryContentType.MoviesTrending)
+            {
+                userId = config.TrendingMoviesUserId;
+                if (userId == Guid.Empty)
+                {
+                    _logger.LogWarning("Trending movies enabled but no user ID configured");
+                    return;
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Unknown global content type: {ContentType}", contentType);
+                return;
+            }
+
+            var globalPath = GetGlobalLibraryPath(contentType);
+            EnsureDirectoryExists(globalPath);
+
+            var providerName = VirtualLibraryContentTypeHelper.GetProviderName(contentType);
+            var cachedContent = _cacheService.GetCachedContent(userId, providerName);
+
+            var mediaType = VirtualLibraryContentTypeHelper.GetMediaType(contentType);
+            var isMovies = mediaType == "Movies";
+
+            var items = FilterContentByMediaType(cachedContent, isMovies);
+
+            _logger.LogInformation(
+                "Refreshing {Count} {MediaType} for global content type {ContentType}",
+                items.Count,
+                mediaType.ToLowerInvariant(),
+                contentType);
+
+            if (isMovies)
+            {
+                RefreshMovieStubFiles(globalPath, items);
+            }
+            else
+            {
+                // Global shows not yet supported, but structure is here for future
+                RefreshShowStubFiles(globalPath, items, contentType, userId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing global stub files for content type {ContentType}", contentType);
         }
     }
 
@@ -634,7 +758,36 @@ public class VirtualLibraryManager
         }
 
         var directoryName = VirtualLibraryContentTypeHelper.GetDirectoryName(contentType);
+
+        // Global content types go in jellynext-virtual/global/[content-type]
+        if (VirtualLibraryContentTypeHelper.IsGlobal(contentType))
+        {
+            return Path.Combine(_virtualLibraryPath, "global", directoryName);
+        }
+
+        // Per-user content types go in jellynext-virtual/[userId]/[content-type]
         return Path.Combine(_virtualLibraryPath, userId.ToString(), directoryName);
+    }
+
+    /// <summary>
+    /// Gets the library path for global content type.
+    /// </summary>
+    /// <param name="contentType">The content type.</param>
+    /// <returns>The full path to the global content type directory.</returns>
+    public string GetGlobalLibraryPath(VirtualLibraryContentType contentType)
+    {
+        if (string.IsNullOrEmpty(_virtualLibraryPath))
+        {
+            throw new InvalidOperationException("Virtual library path not initialized");
+        }
+
+        if (!VirtualLibraryContentTypeHelper.IsGlobal(contentType))
+        {
+            throw new ArgumentException($"Content type {contentType} is not global", nameof(contentType));
+        }
+
+        var directoryName = VirtualLibraryContentTypeHelper.GetDirectoryName(contentType);
+        return Path.Combine(_virtualLibraryPath, "global", directoryName);
     }
 
     /// <summary>
