@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.1.0.3
+
+### Bug Fixes
+
+- **Jellyfin 10.11.0 Compatibility**: Pin SDK to exact version 10.11.0 to ensure compatibility across all 10.11.x releases
+  - Changed `Jellyfin.Controller` and `Jellyfin.Model` dependencies from `10.11.*` to `10.11.0`
+  - Fixes `ReflectionTypeLoadException` on Jellyfin servers running 10.11.0 and 10.11.1
+  - Plugin now works on Jellyfin 10.11.0+
+
 ## v1.1.0.2
 
 ### Documentation
