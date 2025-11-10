@@ -289,15 +289,6 @@
                                 Configure sync schedule in Dashboard → Scheduled Tasks → "Sync Trakt Content".
                             </div>
                         </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="EndedShowsCacheExpirationDays">Ended/Canceled Shows Cache (days):</label>
-                            <input is="emby-input" type="number" id="EndedShowsCacheExpirationDays" name="EndedShowsCacheExpirationDays" min="1" max="365" />
-                            <div class="fieldDescription">
-                                How long to cache ended/canceled shows before re-checking (1-365 days, default: 7).
-                                Shows marked as "ended" or "canceled" by Trakt are cached to reduce API calls.
-                                Longer values reduce API usage but may miss shows that get renewed.
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Playback Settings -->
@@ -761,7 +752,6 @@
                     document.getElementById('SonarrUrl').value = config.SonarrUrl || '';
                     document.getElementById('SonarrApiKey').value = config.SonarrApiKey || '';
                     document.getElementById('CacheExpirationHours').value = config.CacheExpirationHours || 6;
-                    document.getElementById('EndedShowsCacheExpirationDays').value = config.EndedShowsCacheExpirationDays || 7;
                     document.getElementById('PlaybackStopDelaySeconds').value = config.PlaybackStopDelaySeconds !== undefined ? config.PlaybackStopDelaySeconds : 2;
                     document.getElementById('UseShortDummyVideo').checked = config.UseShortDummyVideo !== false;
 
@@ -847,7 +837,6 @@
                     }
 
                     config.CacheExpirationHours = parseInt(document.getElementById('CacheExpirationHours').value);
-                    config.EndedShowsCacheExpirationDays = parseInt(document.getElementById('EndedShowsCacheExpirationDays').value);
                     config.PlaybackStopDelaySeconds = parseInt(document.getElementById('PlaybackStopDelaySeconds').value);
                     config.UseShortDummyVideo = document.getElementById('UseShortDummyVideo').checked;
 

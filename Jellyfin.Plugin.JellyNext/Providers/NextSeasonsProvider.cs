@@ -4,8 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.JellyNext.Helpers;
 using Jellyfin.Plugin.JellyNext.Models.Common;
-using Jellyfin.Plugin.JellyNext.Models.Radarr;
-using Jellyfin.Plugin.JellyNext.Models.Sonarr;
 using Jellyfin.Plugin.JellyNext.Models.Trakt;
 using Jellyfin.Plugin.JellyNext.Services;
 using Microsoft.Extensions.Logging;
@@ -20,7 +18,7 @@ public class NextSeasonsProvider : IContentProvider
     private readonly ILogger<NextSeasonsProvider> _logger;
     private readonly TraktApi _traktApi;
     private readonly LocalLibraryService _localLibraryService;
-    private readonly EndedShowsCacheService _endedShowsCache;
+    private readonly ShowsCacheService _showsCache;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NextSeasonsProvider"/> class.
@@ -28,17 +26,17 @@ public class NextSeasonsProvider : IContentProvider
     /// <param name="logger">The logger.</param>
     /// <param name="traktApi">The Trakt API service.</param>
     /// <param name="localLibraryService">The local library service.</param>
-    /// <param name="endedShowsCache">The ended shows cache service.</param>
+    /// <param name="showsCache">The shows cache service.</param>
     public NextSeasonsProvider(
         ILogger<NextSeasonsProvider> logger,
         TraktApi traktApi,
         LocalLibraryService localLibraryService,
-        EndedShowsCacheService endedShowsCache)
+        ShowsCacheService showsCache)
     {
         _logger = logger;
         _traktApi = traktApi;
         _localLibraryService = localLibraryService;
-        _endedShowsCache = endedShowsCache;
+        _showsCache = showsCache;
     }
 
     /// <inheritdoc />
@@ -69,23 +67,28 @@ public class NextSeasonsProvider : IContentProvider
             return Array.Empty<ContentItem>();
         }
 
+        // Perform sync (full or incremental) - this populates the cache with watched progress
+        await SyncWatchedShows(traktUser);
+
         var contentItems = new List<ContentItem>();
 
         try
         {
-            var watchedShows = await _traktApi.GetWatchedShows(traktUser);
-            _logger.LogInformation("Found {Count} watched shows for user {UserId}", watchedShows.Length, userId);
+            // Get all shows with watched progress from cache for this user (no duplicate API calls!)
+            var watchedShows = _showsCache.GetShowsWithWatchedProgress(userId);
+            var watchedShowsList = watchedShows.ToList();
+            _logger.LogInformation("Processing {Count} watched shows from cache for user {UserId}", watchedShowsList.Count, userId);
 
-            if (watchedShows.Length == 0)
+            if (watchedShowsList.Count == 0)
             {
                 return Array.Empty<ContentItem>();
             }
 
-            foreach (var watchedShow in watchedShows)
+            foreach (var (show, highestWatchedSeason) in watchedShowsList)
             {
                 try
                 {
-                    var contentItem = await ProcessWatchedShowAsync(watchedShow, userId);
+                    var contentItem = await ProcessWatchedShowAsync(show, highestWatchedSeason, traktUser);
                     if (contentItem != null)
                     {
                         contentItems.Add(contentItem);
@@ -96,7 +99,7 @@ public class NextSeasonsProvider : IContentProvider
                     _logger.LogWarning(
                         ex,
                         "Error processing watched show {Title}",
-                        watchedShow.Show.Title);
+                        show.Title);
                 }
             }
 
@@ -113,197 +116,118 @@ public class NextSeasonsProvider : IContentProvider
         return contentItems.AsReadOnly();
     }
 
-    private async Task<ContentItem?> ProcessWatchedShowAsync(TraktWatchedShow watchedShow, Guid userId)
+    /// <summary>
+    /// Syncs watched shows (automatically performs full or incremental sync based on cache state).
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration.</param>
+    private async Task SyncWatchedShows(TraktUser traktUser)
     {
-        _logger.LogInformation(
-            "Processing show: {Title} (Trakt ID: {TraktId}, TVDB ID: {TvdbId}, Status: {Status})",
-            watchedShow.Show.Title,
-            watchedShow.Show.Ids.Trakt,
-            watchedShow.Show.Ids.Tvdb,
-            watchedShow.Show.Status ?? "unknown");
-
-        if (watchedShow.Show.Ids.Tvdb == null || watchedShow.Show.Ids.Tvdb == 0)
-        {
-            return null;
-        }
-
-        var tvdbId = watchedShow.Show.Ids.Tvdb.Value;
-        var highestWatchedSeason = GetHighestWatchedSeason(watchedShow);
-        if (!highestWatchedSeason.HasValue)
-        {
-            return null;
-        }
-
-        var nextSeasonNumber = highestWatchedSeason.Value + 1;
-        var isEnded = IsShowEnded(watchedShow.Show);
-
-        if (await ShouldSkipCachedShowAsync(watchedShow, tvdbId, highestWatchedSeason.Value, nextSeasonNumber, isEnded))
-        {
-            return null;
-        }
-
-        var traktUser = UserHelper.GetTraktUser(userId);
-        var availableSeasons = await GetAvailableSeasonsAsync(watchedShow, traktUser!);
-        if (availableSeasons == null)
-        {
-            return null;
-        }
-
-        var availableSeasonNumbers = GetAiredSeasonNumbers(availableSeasons);
-
-        if (!availableSeasonNumbers.Contains(nextSeasonNumber))
-        {
-            CacheEndedShowIfApplicable(watchedShow, isEnded, highestWatchedSeason.Value, tvdbId);
-            return null;
-        }
-
-        return await CreateContentItemIfNeededAsync(watchedShow, nextSeasonNumber, tvdbId, isEnded);
+        // ShowsCacheService handles full vs incremental logic internally
+        await _showsCache.PerformIncrementalSync(traktUser);
     }
 
-    private int? GetHighestWatchedSeason(TraktWatchedShow watchedShow)
+    /// <summary>
+    /// Processes a watched show to determine if next season should be recommended.
+    /// </summary>
+    private async Task<ContentItem?> ProcessWatchedShowAsync(ShowCacheEntry cachedShow, int highestWatchedSeason, TraktUser traktUser)
     {
-        var watchedSeasons = watchedShow.Seasons
-            .Where(s => s.Number > 0 && s.Episodes.Any())
-            .Select(s => s.Number)
-            .OrderByDescending(s => s)
-            .ToList();
-
-        return watchedSeasons.Any() ? watchedSeasons.First() : null;
-    }
-
-    private bool IsShowEnded(TraktShow show)
-    {
-        return !string.IsNullOrEmpty(show.Status) &&
-               (show.Status.Equals("ended", StringComparison.OrdinalIgnoreCase) ||
-                show.Status.Equals("canceled", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private Task<bool> ShouldSkipCachedShowAsync(
-        TraktWatchedShow watchedShow,
-        int tvdbId,
-        int highestWatchedSeason,
-        int nextSeasonNumber,
-        bool isEnded)
-    {
-        if (!isEnded || !_endedShowsCache.IsShowEnded(tvdbId))
+        if (!cachedShow.TvdbId.HasValue || cachedShow.TvdbId.Value == 0)
         {
-            return Task.FromResult(false);
+            return null;
         }
 
-        var cachedMetadata = _endedShowsCache.GetEndedShow(tvdbId);
-        if (cachedMetadata == null)
-        {
-            return Task.FromResult(false);
-        }
+        var tvdbId = cachedShow.TvdbId.Value;
+        var nextSeasonNumber = highestWatchedSeason + 1;
 
-        if (highestWatchedSeason <= cachedMetadata.LastSeasonWatched)
-        {
-            var existsLocally = _localLibraryService.DoesSeasonExist(tvdbId, nextSeasonNumber);
+        _logger.LogDebug(
+            "Checking next season for {Title} (TVDB: {TvdbId}): highest watched S{Watched}, checking S{Next}",
+            cachedShow.Title,
+            tvdbId,
+            highestWatchedSeason,
+            nextSeasonNumber);
 
-            if (!existsLocally)
+        // Check cache for next season
+        var cachedSeason = _showsCache.GetCachedSeason(tvdbId, nextSeasonNumber);
+
+        // If not in cache and show is not ended, fetch fresh data
+        if (cachedSeason == null && !cachedShow.IsEnded)
+        {
+            _logger.LogDebug(
+                "Next season S{Season} not in cache for ongoing show {Title}, fetching from Trakt",
+                nextSeasonNumber,
+                cachedShow.Title);
+
+            // Fetch latest seasons from Trakt
+            var traktSeasons = await _traktApi.GetShowSeasons(traktUser, cachedShow.TraktId);
+            var nextTraktSeason = traktSeasons.FirstOrDefault(s => s.Number == nextSeasonNumber);
+
+            if (nextTraktSeason != null && nextTraktSeason.AiredEpisodes > 0)
+            {
+                cachedSeason = new SeasonMetadata
+                {
+                    SeasonNumber = nextTraktSeason.Number,
+                    EpisodeCount = nextTraktSeason.EpisodeCount,
+                    AiredEpisodes = nextTraktSeason.AiredEpisodes,
+                    FirstAired = nextTraktSeason.FirstAired,
+                    CachedAt = DateTime.UtcNow
+                };
+            }
+            else
             {
                 _logger.LogDebug(
-                    "Skipping ended/canceled show from cache: {Title} (TVDB: {TvdbId}, Status: {Status}, Last watched: S{Season})",
-                    watchedShow.Show.Title,
-                    tvdbId,
-                    cachedMetadata.Status,
-                    highestWatchedSeason);
-                return Task.FromResult(true);
+                    "Next season S{Season} does not exist or has not aired for {Title}",
+                    nextSeasonNumber,
+                    cachedShow.Title);
+                return null;
             }
-
-            _logger.LogInformation(
-                "Next season S{Season} found locally for cached show {Title} (TVDB: {TvdbId}), checking for newer seasons",
-                nextSeasonNumber,
-                watchedShow.Show.Title,
-                tvdbId);
-        }
-        else
-        {
-            _logger.LogInformation(
-                "User progressed beyond cached season for {Title} (TVDB: {TvdbId}): S{Old} -> S{New}, re-checking seasons",
-                watchedShow.Show.Title,
-                tvdbId,
-                cachedMetadata.LastSeasonWatched,
-                highestWatchedSeason);
         }
 
-        return Task.FromResult(false);
-    }
-
-    private async Task<TraktSeason[]?> GetAvailableSeasonsAsync(TraktWatchedShow watchedShow, TraktUser traktUser)
-    {
-        try
+        // If season not found (even after fetch), return null
+        if (cachedSeason == null)
         {
-            return await _traktApi.GetShowSeasons(traktUser, watchedShow.Show.Ids.Trakt);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Failed to get seasons for {Title} (Trakt ID: {TraktId})",
-                watchedShow.Show.Title,
-                watchedShow.Show.Ids.Trakt);
             return null;
         }
-    }
 
-    private HashSet<int> GetAiredSeasonNumbers(TraktSeason[] seasons)
-    {
-        return seasons
-            .Where(s => s.Number > 0 && s.AiredEpisodes > 0)
-            .Select(s => s.Number)
-            .ToHashSet();
-    }
-
-    private void CacheEndedShowIfApplicable(TraktWatchedShow watchedShow, bool isEnded, int lastSeasonWatched, int tvdbId)
-    {
-        if (isEnded)
+        // Check if season has aired
+        if (cachedSeason.AiredEpisodes == 0)
         {
-            _endedShowsCache.MarkShowAsEnded(watchedShow.Show, lastSeasonWatched);
-            _logger.LogInformation(
-                "Cached ended/canceled show with no more seasons: {Title} (TVDB: {TvdbId}, Status: {Status})",
-                watchedShow.Show.Title,
-                tvdbId,
-                watchedShow.Show.Status);
-        }
-    }
-
-    private Task<ContentItem?> CreateContentItemIfNeededAsync(
-        TraktWatchedShow watchedShow,
-        int nextSeasonNumber,
-        int tvdbId,
-        bool isEnded)
-    {
-        var seasonExistsLocally = _localLibraryService.DoesSeasonExist(tvdbId, nextSeasonNumber);
-
-        if (!seasonExistsLocally)
-        {
-            return Task.FromResult<ContentItem?>(new ContentItem
-            {
-                Type = ContentType.Show,
-                Title = watchedShow.Show.Title,
-                Year = watchedShow.Show.Year,
-                TmdbId = watchedShow.Show.Ids.Tmdb,
-                ImdbId = watchedShow.Show.Ids.Imdb,
-                TvdbId = watchedShow.Show.Ids.Tvdb,
-                TraktId = watchedShow.Show.Ids.Trakt,
-                ProviderName = ProviderName,
-                SeasonNumber = nextSeasonNumber,
-                Genres = watchedShow.Show.Genres
-            });
-        }
-
-        if (isEnded)
-        {
-            _endedShowsCache.MarkShowAsEnded(watchedShow.Show, nextSeasonNumber);
-            _logger.LogInformation(
-                "Cached ended/canceled show with season {Season} in library: {Title} (TVDB: {TvdbId}, Status: {Status})",
+            _logger.LogDebug(
+                "Next season S{Season} has not aired yet for {Title}",
                 nextSeasonNumber,
-                watchedShow.Show.Title,
-                tvdbId,
-                watchedShow.Show.Status);
+                cachedShow.Title);
+            return null;
         }
 
-        return Task.FromResult<ContentItem?>(null);
+        // Check if season exists in local library
+        var existsLocally = _localLibraryService.DoesSeasonExist(tvdbId, nextSeasonNumber);
+        if (existsLocally)
+        {
+            _logger.LogDebug(
+                "Next season S{Season} already exists locally for {Title}",
+                nextSeasonNumber,
+                cachedShow.Title);
+            return null;
+        }
+
+        // Recommend the next season
+        _logger.LogInformation(
+            "Recommending next season S{Season} for {Title} (TVDB: {TvdbId})",
+            nextSeasonNumber,
+            cachedShow.Title,
+            tvdbId);
+
+        return new ContentItem
+        {
+            Type = ContentType.Show,
+            Title = cachedShow.Title,
+            Year = cachedShow.Year,
+            TmdbId = cachedShow.TmdbId,
+            ImdbId = cachedShow.ImdbId,
+            TvdbId = cachedShow.TvdbId,
+            TraktId = cachedShow.TraktId,
+            ProviderName = ProviderName,
+            SeasonNumber = nextSeasonNumber,
+            Genres = cachedShow.Genres
+        };
     }
 }

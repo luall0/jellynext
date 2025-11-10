@@ -65,12 +65,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public int CacheExpirationHours { get; set; } = 6;
 
     /// <summary>
-    /// Gets or sets the ended/canceled shows cache expiration in days (default: 7 days).
-    /// Shows with status "ended" or "canceled" are cached to reduce API calls.
-    /// </summary>
-    public int EndedShowsCacheExpirationDays { get; set; } = 7;
-
-    /// <summary>
     /// Gets or sets the delay in seconds before stopping playback of virtual items (default: 2 seconds).
     /// Some clients need time before playback can be stopped reliably.
     /// </summary>

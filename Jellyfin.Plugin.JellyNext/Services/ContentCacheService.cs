@@ -82,6 +82,18 @@ public class ContentCacheService
     }
 
     /// <summary>
+    /// Clears the cache for a specific user and providers.
+    /// </summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="providerName">Provider name.</param>
+    public void ClearUserCache(Guid userId, string providerName)
+    {
+        var key = GetCacheKey(userId, providerName);
+        _cache.TryRemove(key, out _);
+        _logger.LogInformation("Cleared cached content for user {UserId}, provider {Provider}", userId, providerName);
+    }
+
+    /// <summary>
     /// Clears the cache for a specific user.
     /// </summary>
     /// <param name="userId">The user ID.</param>

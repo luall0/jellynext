@@ -19,7 +19,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddHttpClient();
         serviceCollection.AddSingleton<TraktApi>();
         serviceCollection.AddSingleton<ContentCacheService>();
-        serviceCollection.AddSingleton<EndedShowsCacheService>();
+        serviceCollection.AddSingleton<ShowsCacheService>();
         serviceCollection.AddSingleton<RadarrService>();
         serviceCollection.AddSingleton<SonarrService>();
         serviceCollection.AddSingleton<LocalLibraryService>();

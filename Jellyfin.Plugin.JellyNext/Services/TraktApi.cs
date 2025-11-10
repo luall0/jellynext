@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -425,5 +426,88 @@ public class TraktApi
 
         // Extract the movie objects from the trending items
         return trendingItems.Select(item => item.Movie).ToArray();
+    }
+
+    /// <summary>
+    /// Gets watch history for shows with automatic pagination and date filtering.
+    /// Fetches all pages automatically until no more results are available.
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration.</param>
+    /// <param name="startAt">Start of history window (ISO 8601, optional).</param>
+    /// <param name="endAt">End of history window (ISO 8601, optional).</param>
+    /// <param name="limit">Number of items per page (default: 100, max: 100).</param>
+    /// <returns>List of all watch history items across all pages.</returns>
+    public async Task<TraktHistoryItem[]> GetShowWatchHistory(
+        TraktUser traktUser,
+        DateTime? startAt = null,
+        DateTime? endAt = null,
+        int limit = 100)
+    {
+        var allHistoryItems = new List<TraktHistoryItem>();
+        var page = 1;
+        var hasMorePages = true;
+
+        while (hasMorePages)
+        {
+            var queryParams = $"?page={page}&limit={limit}&extended=full";
+
+            if (startAt.HasValue)
+            {
+                // Format as ISO 8601 with Z suffix
+                queryParams += $"&start_at={startAt.Value.ToUniversalTime():yyyy-MM-ddTHH:mm:ss.fffZ}";
+            }
+
+            if (endAt.HasValue)
+            {
+                // Format as ISO 8601 with Z suffix
+                queryParams += $"&end_at={endAt.Value.ToUniversalTime():yyyy-MM-ddTHH:mm:ss.fffZ}";
+            }
+
+            using var httpClient = await CreateTraktClient(traktUser);
+            var response = await httpClient.GetAsync($"/sync/history/shows{queryParams}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError(
+                    "Failed to get show watch history (page {Page}): Status={Status}, Content={Content}",
+                    page,
+                    response.StatusCode,
+                    errorContent);
+                break;
+            }
+
+            var historyItems = await response.Content.ReadFromJsonAsync<TraktHistoryItem[]>(_jsonOptions);
+            if (historyItems == null || historyItems.Length == 0)
+            {
+                // No more results
+                hasMorePages = false;
+            }
+            else
+            {
+                allHistoryItems.AddRange(historyItems);
+                _logger.LogDebug(
+                    "Fetched {Count} history items from page {Page}",
+                    historyItems.Length,
+                    page);
+
+                // If we got fewer items than the limit, we've reached the last page
+                if (historyItems.Length < limit)
+                {
+                    hasMorePages = false;
+                }
+                else
+                {
+                    page++;
+                }
+            }
+        }
+
+        _logger.LogInformation(
+            "Fetched {TotalCount} total history items across {PageCount} page(s)",
+            allHistoryItems.Count,
+            page);
+
+        return allHistoryItems.ToArray();
     }
 }

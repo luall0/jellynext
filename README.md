@@ -448,7 +448,7 @@ Jellyfin.Plugin.JellyNext/
 │   ├── TraktApi.cs               # Trakt API client (OAuth, recommendations)
 │   ├── ContentSyncService.cs     # Orchestrates sync across users/providers
 │   ├── ContentCacheService.cs    # In-memory content cache (6hr expiration)
-│   ├── EndedShowsCacheService.cs # Cross-user cache for ended shows (7 day default)
+│   ├── ShowsCacheService.cs      # Season-level cache for TV shows with incremental sync
 │   ├── LocalLibraryService.cs    # Jellyfin library queries
 │   ├── PlaybackInterceptor.cs    # Detects virtual playback, triggers downloads
 │   ├── RadarrService.cs          # Radarr API client

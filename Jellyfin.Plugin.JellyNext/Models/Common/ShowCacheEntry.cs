@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Generic;
 
 namespace Jellyfin.Plugin.JellyNext.Models.Common;
 
 /// <summary>
-/// Metadata for an ended/canceled show that never expires.
+/// Cache entry for a TV show with season-level metadata.
 /// </summary>
-public class EndedShowMetadata
+public class ShowCacheEntry
 {
     /// <summary>
     /// Gets or sets the show title.
@@ -38,9 +39,9 @@ public class EndedShowMetadata
     public int TraktId { get; set; }
 
     /// <summary>
-    /// Gets or sets the show status (e.g., "ended", "canceled").
+    /// Gets or sets the show status (e.g., "ended", "canceled", "returning series").
     /// </summary>
-    public string Status { get; set; } = "ended";
+    public string Status { get; set; } = "unknown";
 
     /// <summary>
     /// Gets or sets the genres.
@@ -48,22 +49,24 @@ public class EndedShowMetadata
     public string[] Genres { get; set; } = Array.Empty<string>();
 
     /// <summary>
-    /// Gets or sets the last season watched by any user.
+    /// Gets or sets the cached season metadata (season number → metadata).
     /// </summary>
-    public int LastSeasonWatched { get; set; }
+    public Dictionary<int, SeasonMetadata> Seasons { get; set; } = new Dictionary<int, SeasonMetadata>();
 
     /// <summary>
-    /// Gets or sets when this show was cached.
+    /// Gets or sets when this show was first cached.
     /// </summary>
     public DateTime CachedAt { get; set; }
 
     /// <summary>
-    /// Checks if the cached metadata has expired based on the configured expiration days.
+    /// Gets or sets the highest season number the user has watched at least one episode of.
+    /// Updated during sync based on watch history.
     /// </summary>
-    /// <param name="expirationDays">Number of days before expiration.</param>
-    /// <returns>True if expired, false otherwise.</returns>
-    public bool IsExpired(int expirationDays)
-    {
-        return DateTime.UtcNow - CachedAt > TimeSpan.FromDays(expirationDays);
-    }
+    public int? HighestWatchedSeason { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the show is ended or canceled.
+    /// </summary>
+    public bool IsEnded => Status.Equals("ended", StringComparison.OrdinalIgnoreCase) ||
+                           Status.Equals("canceled", StringComparison.OrdinalIgnoreCase);
 }
