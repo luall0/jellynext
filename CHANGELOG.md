@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.1.2.0
+
+### Improvements
+
+- **Configuration UI Redesign**: Complete overhaul of plugin settings interface with native Jellyfin tab styling
+  - **Tab-based layout**: Organized settings into 4 tabs (General, Trakt, Trending, Downloads)
+  - **Native Jellyfin styling**: Uses `controlgroup` and `localnav` classes matching Jellyfin's UI patterns
+  - **Unified save button**: Single save button now handles all settings including per-user Trakt configurations
+  - **Improved UX**: Removed redundant "Save User Settings" button, cleaner tab navigation
+
+- **Virtual Library Management**: Enhanced global content directory handling
+  - **Automatic cleanup**: Trending movies directory now automatically flushed when feature is disabled
+  - **Consistent state**: Prevents stale content from appearing in global libraries after configuration changes
+
 ## v1.1.1.0
 
 ### Improvements

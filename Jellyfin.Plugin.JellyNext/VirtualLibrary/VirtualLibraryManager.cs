@@ -367,6 +367,14 @@ public class VirtualLibraryManager
             {
                 RefreshGlobalStubFiles(VirtualLibraryContentType.MoviesTrending);
             }
+            else
+            {
+                var path = GetGlobalLibraryPath(VirtualLibraryContentType.MoviesTrending);
+                if (Directory.Exists(path))
+                {
+                    FlushDirectory(path);
+                }
+            }
 
             _logger.LogInformation("Stub file refresh complete for all users");
         }
