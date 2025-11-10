@@ -1,5 +1,46 @@
 # Changelog
 
+## v1.1.1.0
+
+### Improvements
+
+- **Shows Cache Refactoring**: Complete overhaul of season-level caching system
+  - **Hybrid architecture**: Global show/season metadata cache + per-user watch progress tracking
+  - **Incremental sync**: History-based delta syncing via `/sync/history/shows` endpoint reduces API load
+  - **Smart caching**: Ended shows cache all seasons immediately, ongoing shows only cache complete seasons
+  - **Automatic sync mode**: `PerformIncrementalSync()` automatically detects first run and falls back to full sync
+  - **In-memory timestamps**: Last sync timestamp no longer persisted to config (triggers full sync on restart for data freshness)
+  - **Zero duplicate API calls**: Both RecommendationsProvider and NextSeasonsProvider read from same cache
+  - **Progressive discovery**: As users watch episodes, incremental sync detects progression and triggers next season recommendations
+
+- **Next Seasons Provider Enhancement**: Improved reliability and efficiency
+  - **Sync-first approach**: Calls `ShowsCacheService.PerformIncrementalSync()` before fetching content
+  - **Cache-only reads**: Retrieves watched progress + season metadata entirely from cache (no duplicate Trakt API calls)
+  - **Dynamic fetching**: If next season not in cache for ongoing shows, fetches latest from Trakt API and checks season count
+  - **Better library deduplication**: Uses LocalLibraryService to exclude shows already in Jellyfin library
+
+- **Recommendations Provider Optimization**: Uses ShowsCacheService for season counts to avoid duplicate API calls
+
+- **Configuration Simplification**: Removed `EndedShowsCacheExpirationDays` setting (no longer needed with new cache architecture)
+
+### Technical Changes
+
+- **New models**:
+  - `ShowCacheEntry`: Global show/season metadata (Title, Year, IDs, Status, Genres, Seasons dictionary)
+  - `SeasonMetadata`: Season-level data (SeasonNumber, EpisodeCount, AiredEpisodes, FirstAired, IsComplete property)
+  - `TraktHistoryItem`: For parsing `/sync/history/shows` endpoint
+  - `TraktEpisode`: Episode metadata for history items
+
+- **Deleted files**:
+  - `EndedShowsCacheService.cs` (replaced by `ShowsCacheService.cs`)
+  - `EndedShowMetadata.cs` (replaced by `ShowCacheEntry.cs` + `SeasonMetadata.cs`)
+
+- **API additions**:
+  - `TraktApi.GetShowWatchHistory()`: Fetches watch history with automatic pagination support (100 items/page)
+  - `TraktApi.GetWatchedShows()`: Enhanced with `extended=full` parameter for genre data
+
+- **Service registration**: Updated `PluginServiceRegistrator` to use `ShowsCacheService` instead of `EndedShowsCacheService`
+
 ## v1.1.0.3
 
 ### Bug Fixes

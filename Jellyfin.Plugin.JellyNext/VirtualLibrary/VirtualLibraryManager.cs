@@ -580,25 +580,105 @@ public class VirtualLibraryManager
             }
         }
 
-        var currentTvdbIds = items.Select(s => s.TvdbId!.Value).ToHashSet();
-
-        CleanOldShowFolders(existingDirs, currentTvdbIds);
-
         var isNextSeasons = contentType == VirtualLibraryContentType.ShowsNextSeasons;
 
-        foreach (var item in items)
+        if (isNextSeasons)
         {
-            var showFolder = CreateShowFolder(userPath, item);
+            // Use diff-based approach for Next Seasons to avoid unnecessary rescans
+            DiffAndUpdateNextSeasons(userPath, items, existingDirs);
+        }
+        else
+        {
+            // Regular recommendations: use existing logic
+            var currentTvdbIds = items.Select(s => s.TvdbId!.Value).ToHashSet();
+            CleanOldShowFolders(existingDirs, currentTvdbIds);
 
-            if (isNextSeasons && item.SeasonNumber.HasValue)
+            foreach (var item in items)
             {
-                CreateNextSeasonStub(showFolder, item);
-            }
-            else
-            {
+                var showFolder = CreateShowFolder(userPath, item);
                 CreateRegularShowStubs(showFolder, item, userId);
             }
         }
+    }
+
+    /// <summary>
+    /// Performs a diff-based update for Next Seasons to minimize file system changes.
+    /// </summary>
+    private void DiffAndUpdateNextSeasons(string userPath, List<ContentItem> items, string[] existingDirs)
+    {
+        // Build map of what SHOULD exist from cache: TVDB ID -> ContentItem
+        var desiredItems = items
+            .Where(i => i.TvdbId.HasValue && i.SeasonNumber.HasValue)
+            .ToDictionary(i => i.TvdbId!.Value, i => i);
+
+        // Build map of what DOES exist: TVDB ID -> Folder Path
+        var existingFolders = new Dictionary<int, string>();
+        foreach (var dir in existingDirs)
+        {
+            var dirName = Path.GetFileName(dir);
+            var tvdbMatch = System.Text.RegularExpressions.Regex.Match(dirName, @"\[tvdbid-(\d+)\]$");
+            if (tvdbMatch.Success && int.TryParse(tvdbMatch.Groups[1].Value, out var tvdbId))
+            {
+                existingFolders[tvdbId] = dir;
+            }
+        }
+
+        var added = 0;
+        var deleted = 0;
+
+        // Delete folders no longer in cache
+        foreach (var (tvdbId, folderPath) in existingFolders)
+        {
+            if (!desiredItems.ContainsKey(tvdbId))
+            {
+                Directory.Delete(folderPath, recursive: true);
+                _logger.LogDebug("Removed show folder (no longer in cache): {Folder}", Path.GetFileName(folderPath));
+                deleted++;
+            }
+        }
+
+        // Create/update folders based on cache content
+        foreach (var item in desiredItems.Values)
+        {
+            var tvdbId = item.TvdbId!.Value;
+            var desiredSeason = item.SeasonNumber!.Value;
+            var showFolder = CreateShowFolder(userPath, item);
+
+            // Delete stub files for seasons NOT in cache
+            var existingStubs = Directory.GetFiles(showFolder, $"*{StubFileExtension}");
+            foreach (var stub in existingStubs)
+            {
+                var fileName = Path.GetFileName(stub);
+                var seasonMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"S(\d+)E\d+");
+                if (seasonMatch.Success && int.TryParse(seasonMatch.Groups[1].Value, out var existingSeason))
+                {
+                    if (existingSeason != desiredSeason)
+                    {
+                        File.Delete(stub);
+                        _logger.LogDebug("Removed outdated stub: {File}", fileName);
+                    }
+                }
+            }
+
+            // Create stub for desired season if it doesn't exist
+            var desiredStubFileName = $"S{desiredSeason:D2}E01 - Download Season {desiredSeason}{StubFileExtension}";
+            var desiredStubPath = Path.Combine(showFolder, desiredStubFileName);
+            if (!File.Exists(desiredStubPath))
+            {
+                CreateNextSeasonStubInternal(showFolder, item);
+            }
+
+            if (!existingFolders.ContainsKey(tvdbId))
+            {
+                _logger.LogDebug("Added next season: {Title} - S{Season}", item.Title, item.SeasonNumber!.Value);
+                added++;
+            }
+        }
+
+        _logger.LogInformation(
+            "Next Seasons sync complete: {Added} added, {Deleted} deleted",
+            added,
+            deleted);
     }
 
     private void CleanOldShowFolders(string[] existingDirs, HashSet<int> currentTvdbIds)
@@ -634,24 +714,17 @@ public class VirtualLibraryManager
         return showFolder;
     }
 
-    private void CreateNextSeasonStub(string showFolder, ContentItem item)
+    /// <summary>
+    /// Creates a next season stub file (internal version without extra logging).
+    /// </summary>
+    private void CreateNextSeasonStubInternal(string showFolder, ContentItem item)
     {
         var seasonNumber = item.SeasonNumber!.Value;
         var seasonFileName = $"S{seasonNumber:D2}E01 - Download Season {seasonNumber}{StubFileExtension}";
         var stubFile = Path.Combine(showFolder, seasonFileName);
 
-        if (!File.Exists(stubFile))
-        {
-            var content = GetStubFileContent("show");
-            File.WriteAllText(stubFile, content);
-        }
-
-        var year = item.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown";
-        _logger.LogDebug(
-            "Created next season stub: {Title} ({Year}) - Season {Season}",
-            item.Title,
-            year,
-            seasonNumber);
+        var content = GetStubFileContent("show");
+        File.WriteAllText(stubFile, content);
     }
 
     private void CreateRegularShowStubs(string showFolder, ContentItem item, Guid userId)

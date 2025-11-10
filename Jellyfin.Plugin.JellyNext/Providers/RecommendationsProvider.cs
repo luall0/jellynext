@@ -19,22 +19,22 @@ public class RecommendationsProvider : IContentProvider
 {
     private readonly ILogger<RecommendationsProvider> _logger;
     private readonly TraktApi _traktApi;
-    private readonly EndedShowsCacheService _endedShowsCache;
+    private readonly ShowsCacheService _showsCache;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RecommendationsProvider"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="traktApi">The Trakt API service.</param>
-    /// <param name="endedShowsCache">The ended shows cache service.</param>
+    /// <param name="showsCache">The shows cache service.</param>
     public RecommendationsProvider(
         ILogger<RecommendationsProvider> logger,
         TraktApi traktApi,
-        EndedShowsCacheService endedShowsCache)
+        ShowsCacheService showsCache)
     {
         _logger = logger;
         _traktApi = traktApi;
-        _endedShowsCache = endedShowsCache;
+        _showsCache = showsCache;
     }
 
     /// <inheritdoc />
@@ -176,20 +176,22 @@ public class RecommendationsProvider : IContentProvider
 
     private int? TryGetCachedSeasonCount(TraktShow show, bool isEnded)
     {
-        if (!isEnded || show.Ids.Tvdb == null || show.Ids.Tvdb <= 0)
+        if (show.Ids.Tvdb == null || show.Ids.Tvdb <= 0)
         {
             return null;
         }
 
-        var cachedMetadata = _endedShowsCache.GetEndedShow(show.Ids.Tvdb.Value);
-        if (cachedMetadata != null)
+        var cachedShow = _showsCache.GetCachedShow(show.Ids.Tvdb.Value);
+        if (cachedShow != null && cachedShow.Seasons.Count > 0)
         {
+            var airedSeasonCount = cachedShow.Seasons.Values.Count(s => s.AiredEpisodes > 0);
             _logger.LogDebug(
-                "Using cached season count for ended/canceled show: {Title} (TVDB: {TvdbId}, Seasons: {Seasons})",
+                "Using cached season count for show: {Title} (TVDB: {TvdbId}, Status: {Status}, Seasons: {Seasons})",
                 show.Title,
                 show.Ids.Tvdb.Value,
-                cachedMetadata.LastSeasonWatched);
-            return cachedMetadata.LastSeasonWatched;
+                cachedShow.Status,
+                airedSeasonCount);
+            return airedSeasonCount;
         }
 
         return null;
@@ -207,16 +209,8 @@ public class RecommendationsProvider : IContentProvider
                 show.Title,
                 airedSeasonCount);
 
-            if (isEnded && show.Ids.Tvdb != null && show.Ids.Tvdb > 0)
-            {
-                _endedShowsCache.MarkShowAsEnded(show, airedSeasonCount);
-                _logger.LogDebug(
-                    "Cached ended/canceled show from recommendations: {Title} (TVDB: {TvdbId}, Status: {Status}, Seasons: {Seasons})",
-                    show.Title,
-                    show.Ids.Tvdb.Value,
-                    show.Status,
-                    airedSeasonCount);
-            }
+            // Note: ShowsCacheService caching is handled by NextSeasonsProvider's sync process
+            // We don't cache here to avoid redundant caching logic
 
             return airedSeasonCount;
         }

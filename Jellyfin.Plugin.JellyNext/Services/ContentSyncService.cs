@@ -16,7 +16,7 @@ public class ContentSyncService
 {
     private readonly ILogger<ContentSyncService> _logger;
     private readonly ContentCacheService _cacheService;
-    private readonly EndedShowsCacheService _endedShowsCache;
+    private readonly ShowsCacheService _showsCache;
     private readonly IEnumerable<IContentProvider> _providers;
 
     /// <summary>
@@ -24,17 +24,17 @@ public class ContentSyncService
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="cacheService">The cache service.</param>
-    /// <param name="endedShowsCache">The ended shows cache service.</param>
+    /// <param name="showsCache">The shows cache service.</param>
     /// <param name="providers">The collection of content providers.</param>
     public ContentSyncService(
         ILogger<ContentSyncService> logger,
         ContentCacheService cacheService,
-        EndedShowsCacheService endedShowsCache,
+        ShowsCacheService showsCache,
         IEnumerable<IContentProvider> providers)
     {
         _logger = logger;
         _cacheService = cacheService;
-        _endedShowsCache = endedShowsCache;
+        _showsCache = showsCache;
         _providers = providers;
     }
 
@@ -75,15 +75,11 @@ public class ContentSyncService
 
         await Task.WhenAll(syncTasks);
 
-        // Clean up expired shows from the ended shows cache
-        var removedCount = _endedShowsCache.RemoveExpiredShows();
-
-        // Log ended shows cache statistics
-        var endedShowsCount = _endedShowsCache.GetCachedCount();
+        // Log shows cache statistics
+        var cachedShowsCount = _showsCache.GetCachedShowCount();
         _logger.LogInformation(
-            "Completed content sync for all users. Ended shows cache: {Count} shows (removed {Removed} expired)",
-            endedShowsCount,
-            removedCount);
+            "Completed content sync for all users. Shows cache: {Count} shows",
+            cachedShowsCount);
     }
 
     /// <summary>
@@ -132,6 +128,11 @@ public class ContentSyncService
         {
             if (!provider.IsEnabledForUser(userId))
             {
+                if (_cacheService.GetCachedContent(userId, provider.ProviderName).Count != 0)
+                {
+                    _cacheService.ClearUserCache(userId, provider.ProviderName);
+                }
+
                 _logger.LogDebug(
                     "Provider {Provider} not enabled for user {UserId}",
                     provider.ProviderName,

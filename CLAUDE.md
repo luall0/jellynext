@@ -37,10 +37,10 @@ Jellyfin.Plugin.JellyNext/
 ├── Configuration/          # Plugin settings (PluginConfiguration.cs, configPage.html)
 ├── Helpers/                # Utilities (UserHelper.cs)
 ├── Models/                 # Data models organized by service
-│   ├── Common/             # ContentItem, ContentType
+│   ├── Common/             # ContentItem, ContentType, ShowCacheEntry, SeasonMetadata
 │   ├── Radarr/             # Movie, QualityProfile, RootFolder, etc.
 │   ├── Sonarr/             # Series, Season, QualityProfile, etc.
-│   └── Trakt/              # TraktUser, TraktMovie, TraktShow, TraktIds, etc.
+│   └── Trakt/              # TraktUser, TraktMovie, TraktShow, TraktIds, TraktEpisode, TraktHistoryItem, etc.
 ├── Providers/              # Content provider implementations (IContentProvider)
 ├── Resources/              # Embedded resources (dummy.mp4)
 ├── ScheduledTasks/         # Background tasks (ContentSyncScheduledTask.cs)
@@ -85,10 +85,10 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `JellyNextLibraryController.cs`: Query cached content (recommendations, next seasons)
 
 **Services** (`/Services/`):
-- `TraktApi.cs`: Trakt API client (OAuth, recommendations, trending, watchlist, watched progress)
-- `ContentCacheService.cs`: In-memory cache (per-user, per-provider, 6hr expiration)
-- `EndedShowsCacheService.cs`: Cross-user cache for ended/canceled shows (7 day default expiration, configurable)
-- `ContentSyncService.cs`: Sync orchestrator (iterates users/providers, updates cache/virtual library, cleans expired shows)
+- `TraktApi.cs`: Trakt API client (OAuth, recommendations, trending, watchlist, watched shows, seasons, watch history with auto-pagination)
+- `ContentCacheService.cs`: In-memory cache for content items (per-user, per-provider, 6hr expiration)
+- `ShowsCacheService.cs`: **Global season-level cache** + **per-user watch progress tracking**. Supports full sync (first run via `/sync/watched/shows`) and incremental sync (subsequent runs via `/sync/history/shows` with timestamps). Automatically handles ended vs ongoing shows, caching all seasons for ended shows and only complete seasons for ongoing shows. Tracks last sync timestamp in-memory for efficient delta syncing.
+- `ContentSyncService.cs`: Sync orchestrator (iterates users/providers, updates cache/virtual library)
 - `RadarrService.cs`: Radarr API client (movie search/add)
 - `SonarrService.cs`: Sonarr API client (series search/add, per-season monitoring, anime detection)
 - `LocalLibraryService.cs`: Jellyfin library queries (find series by TVDB ID, exclude virtual items)
@@ -96,8 +96,8 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 
 **Providers** (`/Providers/`):
 - `IContentProvider.cs`: Interface (ProviderName, LibraryName, FetchContentAsync, IsEnabledForUser)
-- `RecommendationsProvider.cs`: Fetches Trakt recommendations, uses ended shows cache to skip season API calls for ended/canceled shows
-- `NextSeasonsProvider.cs`: Fetches immediate next unwatched season, uses ended shows cache to skip re-checking completed shows
+- `RecommendationsProvider.cs`: Fetches Trakt recommendations, uses ShowsCacheService for season counts to avoid duplicate API calls
+- `NextSeasonsProvider.cs`: Triggers ShowsCacheService sync, reads watched progress + season data from cache (no duplicate API calls). Dynamically fetches next season from Trakt if not in cache for ongoing shows.
 - `TrendingMoviesProvider.cs`: Fetches Trakt trending movies (global, not per-user)
 
 **Virtual Library** (`/VirtualLibrary/`):
@@ -170,7 +170,7 @@ Background: Plugin.PollingTasks[userGuid] = TraktApi.PollForTokenAsync()
 
 ### Per-User Architecture
 - Each user has own Trakt OAuth token (stored in `PluginConfiguration.TraktUsers[]`)
-- Per-user sync settings: `SyncMovieRecommendations`, `SyncShowRecommendations`, `SyncNextSeasons`, `IgnoreCollected`, `IgnoreWatchlisted`, `LimitShowsToSeasonOne`, `MovieRecommendationsLimit`, `ShowRecommendationsLimit` (all in `TraktUser` model)
+- Per-user sync settings: `SyncMovieRecommendations`, `SyncShowRecommendations`, `SyncNextSeasons`, `IgnoreCollected`, `IgnoreWatchlisted`, `LimitShowsToSeasonOne`, `MovieRecommendationsLimit`, `ShowRecommendationsLimit`, `LastHistorySyncTimestamp` (all in `TraktUser` model)
 - Recommendation limits: User-configurable 1-100 (default: 50), validated with `Math.Clamp()` on save
 - Virtual libraries filtered by userId extracted from path
 - Access via `UserHelper.GetTraktUser(userGuid)`
@@ -196,15 +196,30 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 - Only suggests **immediate next season** (not all missing seasons)
 - Filters: aired episodes > 0, not in local library (via TVDB ID matching)
 - Creates ONE stub per show (not seasons 1-10 like recommendations)
-- Uses ended shows cache to skip re-querying completed shows
-- **Cache invalidation**: Re-checks Trakt if user progresses beyond cached season OR next season appears in local library
+- **Sync-first approach**: Calls `ShowsCacheService.PerformIncrementalSync()` before fetching content (automatically handles full vs incremental)
+- **Cache-only reads**: Retrieves watched progress + season metadata entirely from ShowsCacheService (no duplicate API calls)
+- **Dynamic fetching**: If next season not in cache for ongoing shows, fetches latest from Trakt API via `GetShowSeasons()` and checks season count
+- **Library deduplication**: Uses LocalLibraryService to exclude shows already in Jellyfin library (TVDB ID matching)
 
-### Ended Shows Cache
-- **Purpose**: Reduce API calls for shows with status "ended" or "canceled" (won't get new seasons)
-- **Shared cache**: Both RecommendationsProvider and NextSeasonsProvider use same cache instance
-- **Expiration**: Configurable via `EndedShowsCacheExpirationDays` (default: 7 days, range: 1-365)
-- **Cleanup**: Automatic during each ContentSync, removes expired entries
-- **Smart caching**: Skips API call only if user hasn't progressed AND next season not in library (allows discovery of renewed shows)
+### Shows Cache (Season-Level)
+- **Purpose**: Hybrid caching system with global show/season metadata + per-user watch progress tracking
+- **Architecture**:
+  - **Global cache**: `ConcurrentDictionary<int, ShowCacheEntry>` - shared show/season metadata (TVDB ID → entry)
+  - **Per-user watch progress**: `ConcurrentDictionary<Guid, ConcurrentDictionary<int, int>>` - userId → (TVDB ID → highest watched season)
+  - **In-memory timestamps**: `ConcurrentDictionary<Guid, DateTime>` - tracks last sync per user (NOT persisted to config)
+- **Data models**:
+  - `ShowCacheEntry`: Title, Year, IDs (TMDB/IMDB/TVDB/Trakt), Status, Genres, Seasons dictionary, CachedAt
+  - `SeasonMetadata`: SeasonNumber, EpisodeCount, AiredEpisodes, FirstAired, CachedAt, IsComplete property
+- **Sync strategy**:
+  - **First run**: Full sync via `/sync/watched/shows?extended=full` → cache all shows + seasons + set watch progress
+  - **Subsequent runs**: Incremental sync via `/sync/history/shows?start_at={timestamp}&end_at={timestamp}` → update only changed shows
+  - **Pagination**: `GetShowWatchHistory` auto-fetches all pages (100 items/page, X-Pagination-Page-Count header)
+- **Caching logic**:
+  - **Ended/canceled shows**: Cache all seasons immediately (won't change)
+  - **Ongoing shows**: Only cache complete seasons where `episode_count == aired_episodes`, update incomplete seasons if already cached
+- **Timestamp management**: In-memory only (reset on restart → triggers full sync), set to `UtcNow - 1 minute` after each sync
+- **Progressive discovery**: As user watches episodes, incremental sync detects progression → updates watch progress → triggers next season recommendations
+- **API efficiency**: NextSeasonsProvider + RecommendationsProvider read from cache only (zero duplicate Trakt API calls during content fetch)
 
 ### Jellyfin 10.11 API Changes
 - **UserDataManager**: Requires `User` entity (not `Guid`) - inject `IUserManager`, use `GetUserById(Guid)`
@@ -241,5 +256,20 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
   - `dummy.mp4` (2x2, 1hr, ~2MB) - prevents "watched" status (needs 5% = 3min), requires manual stop
 - **Configuration**: `UseShortDummyVideo` (default: true) - toggles between short/long dummy
 - **Auto-rebuild**: Changing config triggers full stub refresh via `DoesStubContentMatch()` check
+
+### Cache Architecture Refactoring (v1.1.1+)
+**Migration from EndedShowsCacheService to ShowsCacheService**:
+- **Old approach**: Separate `EndedShowsCacheService` with complex custom caching logic, stored `EndedShowMetadata` in config
+- **New approach**: Unified `ShowsCacheService` with hybrid architecture (global show cache + per-user watch progress)
+- **Key improvements**:
+  - **Separation of concerns**: Global metadata cached once (shared across users) vs per-user watch progress tracked separately
+  - **In-memory timestamps**: Last sync timestamp no longer persisted to config (cleaner, triggers full sync on restart for freshness)
+  - **Incremental sync**: History-based delta syncing via `/sync/history/shows` reduces API load
+  - **Smart caching**: Ended shows cache all seasons, ongoing shows only cache complete seasons (avoid stale data)
+  - **Automatic sync mode**: `PerformIncrementalSync()` internally detects first run and falls back to full sync
+  - **Zero duplicate API calls**: Both NextSeasonsProvider and RecommendationsProvider read from same cache
+- **Deleted files**: `EndedShowsCacheService.cs`, `EndedShowMetadata.cs` (replaced by `ShowsCacheService.cs`, `ShowCacheEntry.cs`, `SeasonMetadata.cs`)
+- **New models**: `TraktHistoryItem.cs`, `TraktEpisode.cs` (for history endpoint parsing)
+- **API additions**: `TraktApi.GetShowWatchHistory()` with automatic pagination support
 
 ---
