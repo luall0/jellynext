@@ -8,6 +8,7 @@
     <a href="#installation">Installation</a> •
     <a href="#setup">Setup</a> •
     <a href="#usage">Usage</a> •
+    <a href="WEBHOOK.md">Webhook Guide</a> •
     <a href="#development">Development</a>
   </p>
 </div>
@@ -56,10 +57,14 @@ Features:
 - iOS/tvOS compatible (uses FFprobe-compatible dummy video files)
 
 ### ⬇️ Intelligent Download System
-- **One-Click Downloads**: Click "Play" on any virtual library item to trigger download via Radarr/Sonarr
-- **Automatic Detection**: Plugin detects playback attempts on virtual items and routes to appropriate service
+- **One-Click Downloads**: Click "Play" on any virtual library item to trigger download
+- **Three Integration Modes**:
+  - **Native**: Direct Radarr/Sonarr API integration (default)
+  - **Jellyseerr**: Route all requests through Jellyseerr for centralized management and approval workflows
+  - **Webhooks**: Custom HTTP webhooks for external integrations ([see webhook guide](WEBHOOK.md))
+- **Automatic User Import**: Jellyseerr mode auto-imports Jellyfin users with request-only permissions
 - **Per-Season TV Downloads**: Downloads only the specific season you want, not the entire series
-- **Anime Support**: Automatically detects anime (via Trakt genres) and routes to separate Sonarr anime folder
+- **Anime Support**: Automatically detects anime (via Trakt genres) and routes to separate folder/profile
 - **Playback Prevention**: Clears playback state to prevent marking virtual items as "watched"
 - **Works Everywhere**: All Jellyfin clients (Web, iOS, Android, TV apps)
 
@@ -74,7 +79,9 @@ Features:
 - **Jellyfin 10.11.0 or higher** (required for API compatibility)
 - **.NET 9.0 Runtime** (usually included with Jellyfin)
 - **Trakt Account** (free at [trakt.tv](https://trakt.tv))
-- **(Optional) Radarr/Sonarr** for automatic download functionality
+- **(Optional) Download Integration** - Choose one:
+  - **Radarr/Sonarr** for direct integration
+  - **Jellyseerr** for centralized request management with approval workflows
 
 ### Install from Repository
 
@@ -258,26 +265,80 @@ After linking Trakt and adding virtual libraries:
    - Your virtual libraries should now show content
    - Check that posters and metadata loaded correctly
 
-### Step 4: Configure Radarr/Sonarr (Optional)
+### Step 4: Configure Download Integration (Optional)
 
-If you want to enable automatic downloads when clicking "Play" on virtual library items, configure your *Arr instances.
+If you want to enable automatic downloads when clicking "Play" on virtual library items, choose one of three integration modes:
 
-Navigate to: **Dashboard → Plugins → JellyNext → Settings**
+Navigate to: **Dashboard → Plugins → JellyNext → Download Integration**
 
-#### Radarr Configuration
+#### Choose Your Integration Mode
+
+**Option A: Jellyseerr Integration (Recommended for Multi-User)**
+
+Use this if you want centralized request management, approval workflows, and multi-user request tracking.
+
+1. **Enable Jellyseerr**: Check **"Use Jellyseerr"**
+2. **Jellyseerr URL**: Your Jellyseerr instance (e.g., `http://localhost:5055` or `http://jellyseerr:5055` for Docker)
+3. **Jellyseerr API Key**: Found in Jellyseerr → Settings → General → API Key
+4. Click **Test Jellyseerr Connection** to verify
+
+**Configuration Mode:**
+- **Use Jellyseerr Defaults (Recommended)**:
+  - ✅ Check both **"Use Jellyseerr Default Config"** boxes for Radarr and Sonarr
+  - Uses Jellyseerr's default server and profile settings
+  - No additional configuration needed
+
+- **Manual Configuration**:
+  - ❌ Uncheck default config boxes to manually select:
+    - **Radarr Server**: Choose from dropdown (populated from Jellyseerr)
+    - **Quality Profile**: Select Radarr quality profile
+    - **Sonarr Server**: Choose from dropdown
+    - **Quality Profile**: Select Sonarr quality profile
+    - **(Optional) Anime Profile**: Separate quality profile for anime
+
+**Jellyseerr Features:**
+- ✅ **Auto-Import Users**: Jellyfin users automatically imported to Jellyseerr on first request
+- ✅ **Request Tracking**: All downloads tracked per-user in Jellyseerr
+- ✅ **Approval Workflows**: Configure approval requirements in Jellyseerr settings
+- ✅ **Multi-User Visibility**: Admins can see all user requests in Jellyseerr
+
+**Option B: Native Radarr/Sonarr Integration**
+
+Use this for direct integration without Jellyseerr (simpler setup, but no approval workflows).
+
+1. **Select Native mode** from Download Integration options
+
+**Radarr Configuration:**
 1. **Radarr URL**: Your Radarr instance (e.g., `http://localhost:7878` or `http://radarr:7878` for Docker)
 2. **Radarr API Key**: Found in Radarr → Settings → General → API Key
 3. Click **Test Radarr Connection** to verify
 4. Select **Quality Profile** from dropdown (e.g., "HD-1080p")
 5. Select **Root Folder** from dropdown (e.g., "/movies")
 
-#### Sonarr Configuration
+**Sonarr Configuration:**
 1. **Sonarr URL**: Your Sonarr instance (e.g., `http://localhost:8989` or `http://sonarr:8989` for Docker)
 2. **Sonarr API Key**: Found in Sonarr → Settings → General → API Key
 3. Click **Test Sonarr Connection** to verify
 4. Select **Quality Profile** from dropdown (e.g., "HD-1080p")
 5. Select **Root Folder** from dropdown (e.g., "/tv")
 6. **(Optional) Anime Root Folder**: Separate folder for anime if you use one
+
+**Option C: Webhook Integration (Advanced)**
+
+Use this for custom integrations with external systems, notification services, or non-Radarr/Sonarr download systems.
+
+1. **Select Webhook mode** from Download Integration options
+2. **Configure webhook URLs, headers, and payloads** for movies and TV shows
+3. **See the [Webhook Integration Guide](WEBHOOK.md)** for complete configuration examples and API documentation
+
+**Webhook Features:**
+- ✅ **Complete Flexibility**: Send requests to any HTTP endpoint
+- ✅ **Dynamic Placeholders**: Insert IDs, titles, user info into URLs, headers, and payloads
+- ✅ **Custom Headers**: Support for authentication, API keys, custom headers
+- ✅ **Multiple HTTP Methods**: GET, POST, PUT, PATCH support
+- ✅ **Example Configurations**: Discord/Slack notifications, custom download systems, and more
+
+**[📖 Read the full Webhook Integration Guide →](WEBHOOK.md)**
 
 #### Cache Settings (Optional)
 - **Cache Expiration (hours)**: How long to cache recommendations before refreshing (default: 6 hours)
@@ -323,24 +384,45 @@ When you click "Play" on any virtual library item, the plugin automatically:
 
 1. **Detects the playback attempt** on a virtual item
 2. **Identifies the content** (movie vs TV show, season number, IDs)
-3. **Routes to the correct service**:
-   - Movies → Radarr
-   - TV Shows → Sonarr
+3. **Routes to the configured integration**:
+
+   **Jellyseerr Mode:**
+   - Auto-imports Jellyfin user to Jellyseerr (if not already imported)
+   - Creates request in Jellyseerr with per-user attribution
+   - Respects Jellyseerr approval workflows
+   - Uses default or manually configured server/profile settings
+   - Anime detection routes to anime profile (if configured)
+
+   **Native Mode:**
+   - Movies → Radarr directly
+   - TV Shows → Sonarr directly
    - Anime (detected via Trakt genres) → Sonarr anime folder (if configured)
-4. **Adds to download queue** with your configured quality profile
+
+   **Webhook Mode:**
+   - Replaces placeholders in URL/headers/payload with actual values
+   - Sends HTTP request to your configured webhook endpoint
+   - Your endpoint handles the download however you want
+   - See [Webhook Guide](WEBHOOK.md) for details
+
+4. **Adds to download queue** with your configured quality profile (or triggers your custom webhook)
 5. **Prevents "watched" marking** by clearing playback state
 
 **For TV Shows:**
 - Only the specific season shown in the virtual library is downloaded
-- Season is set to "monitored" in Sonarr
-- Series is added but other seasons remain unmonitored
+- **Native mode**: Season set to "monitored" in Sonarr, other seasons remain unmonitored
+- **Jellyseerr mode**: Respects Jellyseerr's season selection settings
 - Useful for "try before you download everything" approach
 
 **After Download:**
-- Once Radarr/Sonarr downloads and imports the media
-- The real file appears in your main library
+- Once downloaded and imported, the real file appears in your main library
 - You can play it normally from your main library
 - The virtual library item remains (in case you want to download again)
+
+**Request Tracking (Jellyseerr Only):**
+- All requests visible in Jellyseerr dashboard
+- Admins can manage approval workflows
+- Users can see their request status
+- Request history maintained per-user
 
 ### What Happens on Playback
 
@@ -422,8 +504,9 @@ dotnet build -c Release Jellyfin.Plugin.JellyNext/Jellyfin.Plugin.JellyNext.cspr
 Jellyfin.Plugin.JellyNext/
 ├── Api/                          # REST API Controllers
 │   ├── TraktController.cs        # OAuth flow, user management, settings
-│   ├── RadarrController.cs       # Radarr connection testing, profiles, downloads
-│   ├── SonarrController.cs       # Sonarr connection testing, profiles, downloads
+│   ├── JellyseerrController.cs   # Jellyseerr connection testing, server/profile retrieval
+│   ├── RadarrController.cs       # Radarr connection testing, profiles (native mode)
+│   ├── SonarrController.cs       # Sonarr connection testing, profiles (native mode)
 │   └── JellyNextLibraryController.cs  # Query cached content
 ├── Configuration/                # Plugin settings
 │   ├── PluginConfiguration.cs   # Settings model (persisted)
@@ -431,7 +514,8 @@ Jellyfin.Plugin.JellyNext/
 ├── Helpers/                      # Utility classes
 │   └── UserHelper.cs             # User configuration lookups
 ├── Models/                       # Data models organized by service
-│   ├── Common/                   # ContentItem, ContentType
+│   ├── Common/                   # ContentItem, ContentType, DownloadResult
+│   ├── Jellyseerr/               # MediaRequest, JellyseerrUser, RadarrServer, SonarrServer
 │   ├── Trakt/                    # TraktUser, TraktMovie, TraktShow, OAuth models
 │   ├── Radarr/                   # Movie, QualityProfile, RootFolder
 │   └── Sonarr/                   # Series, Season, QualityProfile
@@ -450,9 +534,16 @@ Jellyfin.Plugin.JellyNext/
 │   ├── ContentCacheService.cs    # In-memory content cache (6hr expiration)
 │   ├── ShowsCacheService.cs      # Season-level cache for TV shows with incremental sync
 │   ├── LocalLibraryService.cs    # Jellyfin library queries
-│   ├── PlaybackInterceptor.cs    # Detects virtual playback, triggers downloads
-│   ├── RadarrService.cs          # Radarr API client
-│   └── SonarrService.cs          # Sonarr API client (with anime detection)
+│   ├── PlaybackInterceptor.cs    # Detects virtual playback, routes to download provider
+│   ├── JellyseerrService.cs      # Jellyseerr API client (user import, requests)
+│   ├── RadarrService.cs          # Radarr API client (native mode)
+│   ├── SonarrService.cs          # Sonarr API client (native mode, anime detection)
+│   └── DownloadProviders/        # Download provider implementations
+│       ├── IDownloadProvider.cs  # Provider interface
+│       ├── JellyseerrDownloadProvider.cs  # Jellyseerr integration
+│       ├── NativeDownloadProvider.cs      # Direct Radarr/Sonarr integration
+│       ├── WebhookDownloadProvider.cs     # Custom webhook integration
+│       └── DownloadProviderFactory.cs     # Provider selection
 ├── VirtualLibrary/               # Virtual library system
 │   ├── VirtualLibraryManager.cs  # Stub file creation/management
 │   ├── VirtualLibraryCreator.cs  # Initialization
@@ -481,10 +572,17 @@ Jellyfin.Plugin.JellyNext/
    - Ended shows cache: 7 day expiration (shows that won't get new seasons)
    - Reduces API calls while keeping data fresh
 
-4. **Playback Interception**: Event-driven download triggers
+4. **Download Provider Pattern**: Pluggable download backends
+   - `IDownloadProvider` interface for extensibility
+   - `NativeDownloadProvider`: Direct Radarr/Sonarr API calls
+   - `JellyseerrDownloadProvider`: Routes through Jellyseerr API
+   - `WebhookDownloadProvider`: Custom HTTP webhook integration
+   - Factory pattern selects provider based on config
+
+5. **Playback Interception**: Event-driven download triggers
    - Listens for PlaybackStart events
    - Detects virtual library paths via regex
-   - Routes to appropriate download service
+   - Routes to selected download provider
    - Clears playback state to prevent "watched" marking
 
 ### Contributing
@@ -564,22 +662,47 @@ Contributions are welcome! Please:
 ### Download Issues
 
 **"Downloads not triggering"**
-- Verify Radarr/Sonarr configuration: **Dashboard → Plugins → JellyNext → Test Connection**
-- Check that quality profile and root folder are selected
-- Ensure Radarr/Sonarr are accessible from Jellyfin server (same network/proper URLs)
-- Look for errors in Radarr/Sonarr logs
-- Verify PlaybackInterceptor is running: check Jellyfin logs for "JellyNext: Playback detected"
+- **Check integration mode**: Verify which mode you're using (Native, Jellyseerr, or Webhook)
+- **Jellyseerr mode**:
+  - Verify Jellyseerr configuration: **Dashboard → Plugins → JellyNext → Test Jellyseerr Connection**
+  - Ensure Jellyseerr is accessible from Jellyfin server
+  - Check Jellyseerr logs for import/request errors
+  - Verify Jellyseerr has Radarr/Sonarr configured properly
+- **Native mode**:
+  - Verify Radarr/Sonarr configuration: **Dashboard → Plugins → JellyNext → Test Connection**
+  - Check that quality profile and root folder are selected
+  - Ensure Radarr/Sonarr are accessible from Jellyfin server (same network/proper URLs)
+- **Webhook mode**:
+  - Verify webhook URLs are configured for both movies and shows
+  - Check webhook endpoint is accessible from Jellyfin server
+  - See [Webhook Integration Guide](WEBHOOK.md) for detailed troubleshooting
+- Verify PlaybackInterceptor is running: check Jellyfin logs for "Playback detected"
 
 **"Downloads trigger but fail"**
-- Check Radarr/Sonarr logs for specific error messages
-- Verify root folder has write permissions
-- Ensure quality profile exists and is active
+- **Jellyseerr mode**:
+  - Check Jellyseerr request status (may be pending approval)
+  - Verify Jellyseerr's Radarr/Sonarr connection settings
+  - Look for errors in Jellyseerr logs
+- **Native mode**:
+  - Check Radarr/Sonarr logs for specific error messages
+  - Verify root folder has write permissions
+  - Ensure quality profile exists and is active
 - Check TMDB/TVDB IDs are valid (verify in .strm filename: `[tmdbid-12345]`)
 
-**"Anime not going to anime folder"**
-- Verify "Sonarr Anime Root Folder" is configured
+**"Anime not going to anime folder/profile"**
+- **Jellyseerr mode**:
+  - Configure separate anime profile in plugin settings
+  - Ensure Jellyseerr Sonarr server has anime directory configured
+- **Native mode**:
+  - Verify "Sonarr Anime Root Folder" is configured
+  - Ensure the anime root folder exists and is writable
 - Check that Trakt metadata includes "anime" genre (enable "Extra Logging" for debug info)
-- Ensure the anime root folder exists and is writable
+
+**"User not being imported to Jellyseerr"**
+- Verify Jellyfin user ID is valid
+- Check Jellyseerr logs for import errors
+- Ensure Jellyseerr API key has admin permissions
+- Manually test import via Jellyseerr UI: Settings → Users → Import from Jellyfin
 
 **"Item marked as watched after download attempt"**
 - This should be prevented automatically by PlaybackInterceptor
@@ -620,8 +743,20 @@ A: No, JellyNext works with free Trakt accounts.
 **Q: Will this download content automatically?**
 A: No, downloads are triggered only when you click "Play" on a virtual library item. It's a manual one-click process.
 
-**Q: Can I use this without Radarr/Sonarr?**
+**Q: Can I use this without Radarr/Sonarr/Jellyseerr?**
 A: Yes, you can still use the virtual libraries to browse recommendations. Downloads just won't work.
+
+**Q: Which integration mode should I use?**
+A:
+- **Jellyseerr**: Best for multi-user setups, approval workflows, centralized request management
+- **Native**: Best for single-user or direct downloads without approval workflows
+- **Webhook**: Best for custom integrations, notification services, or non-Radarr/Sonarr systems
+
+**Q: Do I need both Jellyseerr AND Radarr/Sonarr?**
+A: If using Jellyseerr mode, you only need to configure Jellyseerr. Jellyseerr then communicates with Radarr/Sonarr. In Native mode, you configure Radarr/Sonarr directly. In Webhook mode, you configure your own custom endpoint.
+
+**Q: Can I integrate with systems other than Radarr/Sonarr?**
+A: Yes! Use Webhook mode to integrate with any system that accepts HTTP requests. See the [Webhook Integration Guide](WEBHOOK.md) for examples.
 
 **Q: Does this affect my real Jellyfin libraries?**
 A: No, virtual libraries are completely separate. They don't modify or interfere with your existing media.
@@ -671,6 +806,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 - **[TMDB](https://www.themoviedb.org)** & **[TVDB](https://thetvdb.com)**: Metadata providers used by Jellyfin
 - **[Jellyfin](https://jellyfin.org)**: Open-source media server platform
 - **[jellyfin-plugin-trakt](https://github.com/jellyfin/jellyfin-plugin-trakt)**: OAuth implementation reference
+- **[Jellyseerr](https://github.com/Fallenbagel/jellyseerr)**: Request management system
 - **[Radarr](https://radarr.video)** & **[Sonarr](https://sonarr.tv)**: Automated media management
 
 ---

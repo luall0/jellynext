@@ -33,18 +33,20 @@ Jellyfin plugin integrating Trakt-powered discovery with per-user virtual librar
 ### Directory Structure
 ```
 Jellyfin.Plugin.JellyNext/
-├── Api/                    # REST API Controllers (Trakt, Radarr, Sonarr, JellyNextLibrary)
+├── Api/                    # REST API Controllers (Trakt, Radarr, Sonarr, Jellyseerr, JellyNextLibrary)
 ├── Configuration/          # Plugin settings (PluginConfiguration.cs, configPage.html)
 ├── Helpers/                # Utilities (UserHelper.cs)
 ├── Models/                 # Data models organized by service
-│   ├── Common/             # ContentItem, ContentType, ShowCacheEntry, SeasonMetadata
+│   ├── Common/             # ContentItem, ContentType, ShowCacheEntry, SeasonMetadata, DownloadResult
+│   ├── Jellyseerr/         # MediaRequest, JellyseerrUser, RadarrServer, SonarrServer, etc.
 │   ├── Radarr/             # Movie, QualityProfile, RootFolder, etc.
 │   ├── Sonarr/             # Series, Season, QualityProfile, etc.
 │   └── Trakt/              # TraktUser, TraktMovie, TraktShow, TraktIds, TraktEpisode, TraktHistoryItem, etc.
 ├── Providers/              # Content provider implementations (IContentProvider)
 ├── Resources/              # Embedded resources (dummy.mp4)
 ├── ScheduledTasks/         # Background tasks (ContentSyncScheduledTask.cs)
-├── Services/               # Business logic (TraktApi, ContentSync, Radarr/Sonarr, etc.)
+├── Services/               # Business logic (TraktApi, ContentSync, Radarr/Sonarr, Jellyseerr, etc.)
+│   └── DownloadProviders/  # IDownloadProvider, NativeDownloadProvider, JellyseerrDownloadProvider, WebhookDownloadProvider
 ├── VirtualLibrary/         # Virtual library system (Manager, Creator, ContentType)
 ├── Plugin.cs               # Main entry point
 └── PluginServiceRegistrator.cs  # DI registration
@@ -53,7 +55,8 @@ Jellyfin.Plugin.JellyNext/
 ### Key Components
 - **Content Providers** (`IContentProvider`): Modular sources (RecommendationsProvider, NextSeasonsProvider, TrendingMoviesProvider)
 - **Virtual Libraries**: Per-user .strm stub files (`jellynext-virtual/[userId]/[content-type]/`) + global content (`jellynext-virtual/global/[content-type]/`)
-- **Playback Interception**: Detects virtual item playback, triggers Radarr/Sonarr downloads
+- **Download Providers** (`IDownloadProvider`): Pluggable download backends (NativeDownloadProvider for direct Radarr/Sonarr, JellyseerrDownloadProvider for Jellyseerr API, WebhookDownloadProvider for custom HTTP webhooks)
+- **Playback Interception**: Detects virtual item playback, triggers downloads via selected provider
 - **OAuth**: Per-user Trakt tokens with auto-refresh (stored in `PluginConfiguration.TraktUsers[]`)
 - **Sync System**: `ContentSyncScheduledTask` + `StartupSyncService` → cache → .strm files → library scan
 
@@ -80,8 +83,9 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 
 **API Controllers** (`/Api/`):
 - `TraktController.cs`: OAuth device flow, token polling/refresh, user unlinking, per-user settings (GET/POST `/Users/{userGuid}/Settings`)
-- `RadarrController.cs`: Connection test, profile/folder retrieval, movie downloads
-- `SonarrController.cs`: Connection test, profile/folder retrieval, TV show/season downloads
+- `RadarrController.cs`: Connection test, profile/folder retrieval, movie downloads (native integration)
+- `SonarrController.cs`: Connection test, profile/folder retrieval, TV show/season downloads (native integration)
+- `JellyseerrController.cs`: Connection test, server/profile retrieval for Radarr/Sonarr via Jellyseerr
 - `JellyNextLibraryController.cs`: Query cached content (recommendations, next seasons)
 
 **Services** (`/Services/`):
@@ -89,10 +93,12 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `ContentCacheService.cs`: In-memory cache for content items (per-user, per-provider, 6hr expiration)
 - `ShowsCacheService.cs`: **Global season-level cache** + **per-user watch progress tracking**. Supports full sync (first run via `/sync/watched/shows`) and incremental sync (subsequent runs via `/sync/history/shows` with timestamps). Automatically handles ended vs ongoing shows, caching all seasons for ended shows and only complete seasons for ongoing shows. Tracks last sync timestamp in-memory for efficient delta syncing.
 - `ContentSyncService.cs`: Sync orchestrator (iterates users/providers, updates cache/virtual library)
-- `RadarrService.cs`: Radarr API client (movie search/add)
-- `SonarrService.cs`: Sonarr API client (series search/add, per-season monitoring, anime detection)
+- `JellyseerrService.cs`: Jellyseerr API client (user import/management, movie/TV requests, server/profile retrieval)
+- `RadarrService.cs`: Radarr API client (movie search/add) - native integration only
+- `SonarrService.cs`: Sonarr API client (series search/add, per-season monitoring, anime detection) - native integration only
 - `LocalLibraryService.cs`: Jellyfin library queries (find series by TVDB ID, exclude virtual items)
-- `PlaybackInterceptor.cs`: IHostedService detecting virtual item playback, triggering downloads
+- `PlaybackInterceptor.cs`: IHostedService detecting virtual item playback, uses DownloadProviderFactory to route requests
+- `DownloadProviderFactory.cs`: Factory selecting NativeDownloadProvider, JellyseerrDownloadProvider, or WebhookDownloadProvider based on config
 
 **Providers** (`/Providers/`):
 - `IContentProvider.cs`: Interface (ProviderName, LibraryName, FetchContentAsync, IsEnabledForUser)
@@ -138,8 +144,13 @@ User plays virtual item → PlaybackStart event
   → PlaybackInterceptor.OnPlaybackStart()
     → Extract userId/contentType/IDs from path regex
     → ContentCacheService.GetCachedContent() (lookup metadata)
-    → If movie: RadarrService.AddMovieAsync()
-    → If show: SonarrService.AddSeriesAsync() (with season monitoring)
+    → DownloadProviderFactory.GetProvider() (select Native, Jellyseerr, or Webhook)
+    → IDownloadProvider.RequestMovieAsync() or RequestShowAsync()
+      → NativeDownloadProvider: RadarrService/SonarrService direct API calls
+      → JellyseerrDownloadProvider: JellyseerrService.RequestMovieAsync/RequestTvShowAsync()
+        → Auto-import Jellyfin user if not in Jellyseerr (EnsureUserExistsAsync)
+        → X-Api-User header for per-user attribution
+      → WebhookDownloadProvider: HTTP request with placeholder replacement (URL/headers/payload)
 
 User stops playback → PlaybackStopped event
   → PlaybackInterceptor.OnPlaybackStopped()
@@ -187,9 +198,26 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 - Trakt rotates refresh tokens on each refresh - **always save new tokens**
 - Background polling tracked in `Plugin.Instance.PollingTasks`
 
+### Download Integration Modes
+- **Native mode** (`DownloadIntegration=0`): Direct Radarr/Sonarr API integration (default for backward compatibility)
+- **Jellyseerr mode** (`DownloadIntegration=1`): Routes all requests via Jellyseerr
+  - **Auto-import**: Users auto-imported from Jellyfin on first request with REQUEST-only permissions
+  - **User attribution**: X-Api-User header ensures requests tracked per Jellyfin user
+  - **Config modes**:
+    - **Default mode** (`UseJellyseerrRadarrDefaults=true`): Uses Jellyseerr's default server/profile settings
+    - **Manual mode** (`UseJellyseerrRadarrDefaults=false`): Explicit server/profile selection from UI dropdowns
+  - **Anime support**: Separate profile (`JellyseerrSonarrAnimeProfileId`) optional for anime routing
+  - **GUID normalization**: Jellyseerr stores UUIDs without hyphens (73f7d5b9...), Jellyfin uses standard format (73f7d5b9-4d03-...)
+- **Webhook mode** (`DownloadIntegration=2`): Custom HTTP webhooks for external integrations
+  - **Placeholder support**: Movies: `{tmdbId}`, `{imdbId}`, `{title}`, `{year}`, `{jellyfinUserId}` | Shows: add `{tvdbId}`, `{seasonNumber}`, `{isAnime}`
+  - **Configurable**: HTTP method (GET/POST/PUT/PATCH), custom headers, JSON payload templates
+  - **Use case**: Integration with custom download systems, notification services, or third-party automation
+
 ### TV Show Downloads
-- **Per-season monitoring**: Series `Monitored=true`, but only specific season has `Monitored=true` in seasons array
-- **Anime detection**: Uses Trakt genre metadata (`ContentItem.Genres` contains "anime") to route to `SonarrAnimeRootFolderPath` vs `SonarrRootFolderPath`
+- **Per-season monitoring**: Series `Monitored=true`, but only specific season has `Monitored=true` in seasons array (native mode)
+- **Anime detection**: Uses Trakt genre metadata (`ContentItem.Genres` contains "anime")
+  - **Native**: Routes to `SonarrAnimeRootFolderPath` vs `SonarrRootFolderPath`
+  - **Jellyseerr**: Uses `JellyseerrSonarrAnimeProfileId` if configured, otherwise falls back to regular profile
 - **"Next Up" prevention**: Clear playback state in `PlaybackStopped` event (not `PlaybackStart`)
 
 ### Next Seasons Discovery
