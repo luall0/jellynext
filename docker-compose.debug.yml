@@ -1,11 +1,10 @@
 version: '3.8'
 
 services:
-  jellyfin:
+  jellyfin-jellynext-debug:
     build:
       context: .
       dockerfile: Dockerfile.debug
-    container_name: jellyfin-jellynext-debug
     environment:
       - PUID=1000
       - PGID=1000
@@ -21,17 +20,66 @@ services:
       - jellyfin-cache:/cache
       - ./../media_server/data/media/tv:/data
     networks:
-      - media_network
+      - jellynext_network
     ports:
       - "8097:8096"   # HTTP Web UI
       - "4024:4024"   # Remote debugger port
     restart: unless-stopped
 
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr-debug
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - radarr-config:/config
+      - ./../media_server/data/media:/data
+    networks:
+      - jellynext_network
+    ports:
+      - "7878:7878"
+    restart: unless-stopped
+
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr-debug
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - sonarr-config:/config
+      - ./../media_server/data/media:/data
+    networks:
+      - jellynext_network
+    ports:
+      - "8989:8989"
+    restart: unless-stopped
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr-debug
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - jellyseerr-config:/app/config
+    networks:
+      - jellynext_network
+    ports:
+      - "5055:5055"
+    restart: unless-stopped
+
 networks:
-  media_network:
-    external: true
-    name: media_server_media_network
+  jellynext_network:
+    driver: bridge
 
 volumes:
   jellyfin-cache:
+  radarr-config:
+  sonarr-config:
+  jellyseerr-config:
 

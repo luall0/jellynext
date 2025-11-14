@@ -10,10 +10,97 @@ using MediaBrowser.Model.Plugins;
 namespace Jellyfin.Plugin.JellyNext.Configuration;
 
 /// <summary>
+/// Download integration type.
+/// </summary>
+public enum DownloadIntegrationType
+{
+    /// <summary>
+    /// Native integration using Radarr/Sonarr directly.
+    /// </summary>
+    Native = 0,
+
+    /// <summary>
+    /// Jellyseerr integration for downloads.
+    /// </summary>
+    Jellyseerr = 1,
+
+    /// <summary>
+    /// Webhook integration for custom download handling.
+    /// </summary>
+    Webhook = 2
+}
+
+/// <summary>
+/// Represents a custom header for webhook requests.
+/// </summary>
+public class WebhookHeader
+{
+    /// <summary>
+    /// Gets or sets the header name.
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the header value.
+    /// </summary>
+    public string Value { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Plugin configuration for JellyNext.
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {
+    /// <summary>
+    /// Gets or sets the download integration type (Native or Jellyseerr).
+    /// </summary>
+    public DownloadIntegrationType DownloadIntegration { get; set; } = DownloadIntegrationType.Native;
+
+    /// <summary>
+    /// Gets or sets the Jellyseerr URL.
+    /// </summary>
+    public string JellyseerrUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the Jellyseerr API Key.
+    /// </summary>
+    public string JellyseerrApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the selected Jellyseerr Radarr server ID.
+    /// </summary>
+    public int? JellyseerrRadarrServerId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the selected Jellyseerr Radarr profile ID.
+    /// </summary>
+    public int? JellyseerrRadarrProfileId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the selected Jellyseerr Sonarr server ID.
+    /// </summary>
+    public int? JellyseerrSonarrServerId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the selected Jellyseerr Sonarr profile ID.
+    /// </summary>
+    public int? JellyseerrSonarrProfileId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the selected Jellyseerr Sonarr anime profile ID (optional).
+    /// </summary>
+    public int? JellyseerrSonarrAnimeProfileId { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to use Jellyseerr's default Radarr configuration.
+    /// </summary>
+    public bool UseJellyseerrRadarrDefaults { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to use Jellyseerr's default Sonarr configuration.
+    /// </summary>
+    public bool UseJellyseerrSonarrDefaults { get; set; } = true;
+
     /// <summary>
     /// Gets or sets the Radarr URL.
     /// </summary>
@@ -58,6 +145,60 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the Sonarr Anime Root Folder Path (optional, for separate anime library).
     /// </summary>
     public string SonarrAnimeRootFolderPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the webhook URL for movie downloads.
+    /// Supports placeholders: {tmdbId}, {imdbId}, {title}, {year}, {jellyfinUserId}.
+    /// </summary>
+    public string WebhookMovieUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the webhook URL for TV show downloads.
+    /// Supports placeholders: {tvdbId}, {tmdbId}, {imdbId}, {title}, {year}, {seasonNumber}, {isAnime}, {jellyfinUserId}.
+    /// </summary>
+    public string WebhookShowUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the HTTP method for webhook requests (GET or POST).
+    /// </summary>
+    public string WebhookMethod { get; set; } = "POST";
+
+    /// <summary>
+    /// Gets or sets the custom headers for webhook movie requests.
+    /// </summary>
+    public WebhookHeader[] WebhookMovieHeaders { get; set; } = Array.Empty<WebhookHeader>();
+
+    /// <summary>
+    /// Gets or sets the custom headers for webhook show requests.
+    /// </summary>
+    public WebhookHeader[] WebhookShowHeaders { get; set; } = Array.Empty<WebhookHeader>();
+
+    /// <summary>
+    /// Gets or sets the custom payload template for webhook movie requests (JSON format).
+    /// Supports placeholders: {tmdbId}, {imdbId}, {title}, {year}, {jellyfinUserId}.
+    /// </summary>
+    public string WebhookMoviePayload { get; set; } = @"{
+  ""tmdbId"": ""{tmdbId}"",
+  ""imdbId"": ""{imdbId}"",
+  ""title"": ""{title}"",
+  ""year"": ""{year}"",
+  ""jellyfinUserId"": ""{jellyfinUserId}""
+}";
+
+    /// <summary>
+    /// Gets or sets the custom payload template for webhook show requests (JSON format).
+    /// Supports placeholders: {tvdbId}, {tmdbId}, {imdbId}, {title}, {year}, {seasonNumber}, {isAnime}, {jellyfinUserId}.
+    /// </summary>
+    public string WebhookShowPayload { get; set; } = @"{
+  ""tvdbId"": ""{tvdbId}"",
+  ""tmdbId"": ""{tmdbId}"",
+  ""imdbId"": ""{imdbId}"",
+  ""title"": ""{title}"",
+  ""year"": ""{year}"",
+  ""seasonNumber"": {seasonNumber},
+  ""isAnime"": {isAnime},
+  ""jellyfinUserId"": ""{jellyfinUserId}""
+}";
 
     /// <summary>
     /// Gets or sets the cache expiration interval in hours.

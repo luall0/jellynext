@@ -1,5 +1,89 @@
 # Changelog
 
+## v1.2.0.0
+
+### Features
+
+- **Download Integration Modes**: Complete overhaul of download system with three pluggable integration modes
+  - **Native Mode** (default): Direct Radarr/Sonarr API integration for granular control
+  - **Jellyseerr Mode**: Centralized request management with approval workflows and multi-user tracking
+  - **Webhook Mode**: Custom HTTP webhooks for complete flexibility and external system integration
+  - Factory pattern (`DownloadProviderFactory`) selects provider based on configuration
+  - All modes support anime detection and per-season TV downloads
+
+- **Jellyseerr Integration**: Full integration with Jellyseerr request management system
+  - **Automatic user import**: Jellyfin users auto-imported to Jellyseerr on first request with REQUEST-only permissions
+  - **Per-user attribution**: All requests tracked per-user via `X-Api-User` header
+  - **Approval workflows**: Respects Jellyseerr approval settings and request quotas
+  - **Configuration modes**:
+    - Default mode: Uses Jellyseerr's default Radarr/Sonarr server and profile settings
+    - Manual mode: Explicit server and profile selection from UI dropdowns
+  - **Server/profile selection**: UI dynamically loads Radarr/Sonarr servers and quality profiles from Jellyseerr
+  - **Anime support**: Optional separate anime profile for TV shows detected via Trakt genres
+  - **GUID normalization**: Handles UUID format differences between Jellyseerr (no hyphens) and Jellyfin (standard format)
+  - **Connection testing**: Test Jellyseerr connection and validate API key from plugin settings
+  - New service: `JellyseerrService` for API communication
+  - New controller: `JellyseerrController` for UI configuration
+  - New models: `MediaRequest`, `JellyseerrUser`, `RadarrServer`, `SonarrServer`, `QualityProfile`
+
+- **Webhook Integration**: Custom HTTP webhook support for external integrations
+  - **Flexible HTTP methods**: GET, POST, PUT, PATCH support
+  - **Dynamic placeholders**: Replace variables in URLs, headers, and payloads
+    - Movies: `{tmdbId}`, `{imdbId}`, `{title}`, `{year}`, `{jellyfinUserId}`
+    - TV Shows: All movie placeholders + `{tvdbId}`, `{seasonNumber}`, `{isAnime}`
+  - **Custom headers**: Add authentication, API keys, or any custom headers with placeholder support
+  - **JSON payload templates**: Fully customizable request body with default templates included
+  - **Separate configurations**: Independent settings for movies vs TV shows
+  - **Use cases**: Discord/Slack notifications, custom download systems, third-party automation
+  - New service: `WebhookDownloadProvider` implementing `IDownloadProvider`
+  - New configuration fields: `WebhookMovieUrl`, `WebhookShowUrl`, `WebhookMethod`, `WebhookMovieHeaders`, `WebhookShowHeaders`, `WebhookMoviePayload`, `WebhookShowPayload`
+  - New model: `WebhookHeader` for custom header configuration
+  - Comprehensive documentation: New `WEBHOOK.md` guide with examples and troubleshooting
+
+### Improvements
+
+- **Download Provider Architecture**: Pluggable provider system for extensibility
+  - `IDownloadProvider` interface defines contract for all download providers
+  - `NativeDownloadProvider`: Implements direct Radarr/Sonarr integration
+  - `JellyseerrDownloadProvider`: Implements Jellyseerr API integration
+  - `WebhookDownloadProvider`: Implements custom HTTP webhook integration
+  - `DownloadProviderFactory`: Factory pattern selects provider based on `DownloadIntegration` enum
+  - `PlaybackInterceptor` uses factory to route download requests
+
+- **Configuration UI Enhancements**: Redesigned download integration section
+  - **Visual integration selector**: Card-based UI with icons and descriptions for each mode
+  - **Dynamic sections**: UI shows/hides relevant settings based on selected integration mode
+  - **Webhook UI**: Interactive payload editors with placeholder insertion buttons
+  - **Header management**: Add/remove custom headers dynamically for webhook requests
+  - **Payload reset**: Quick reset to default payload templates
+  - **Real-time validation**: Client-side validation for URLs, headers, and JSON payloads
+
+- **Documentation**: Comprehensive guides for all integration modes
+  - Updated README.md with three integration modes in setup guide
+  - New WEBHOOK.md with complete webhook integration guide including:
+    - Configuration examples (GET, POST, authentication, Discord/Slack)
+    - Building custom webhook endpoints (Python Flask, Node.js Express)
+    - Troubleshooting guide
+    - Security considerations
+    - Advanced usage patterns
+  - Updated CLAUDE.md with download provider architecture
+  - FAQ updates covering all three integration modes
+
+### Technical Changes
+
+- **New enum**: `DownloadIntegrationType` with values: `Native = 0`, `Jellyseerr = 1`, `Webhook = 2`
+- **Configuration migration**: Changed from `UseJellyseerr` boolean to `DownloadIntegration` enum (backward compatible)
+- **Service registration**: All download providers registered in `PluginServiceRegistrator`
+- **API Controllers**:
+  - `JellyseerrController`: Connection testing, server/profile retrieval
+  - Enhanced error handling and logging across all providers
+- **Models**:
+  - `MediaRequest`: Jellyseerr request model with media IDs and user tracking
+  - `JellyseerrUser`: User model for auto-import functionality
+  - `RadarrServer` / `SonarrServer`: Server configuration models
+  - `WebhookHeader`: Custom header model for webhook requests
+- **HTTP Client**: All providers use `NamedClient.Default` for Cloudflare bypass compatibility
+
 ## v1.1.2.0
 
 ### Improvements

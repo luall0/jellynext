@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.JellyNext.Providers;
 using Jellyfin.Plugin.JellyNext.Services;
+using Jellyfin.Plugin.JellyNext.Services.DownloadProviders;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Resolvers;
@@ -22,7 +23,14 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ShowsCacheService>();
         serviceCollection.AddSingleton<RadarrService>();
         serviceCollection.AddSingleton<SonarrService>();
+        serviceCollection.AddSingleton<JellyseerrService>();
         serviceCollection.AddSingleton<LocalLibraryService>();
+
+        // Download providers
+        serviceCollection.AddSingleton<NativeDownloadProvider>();
+        serviceCollection.AddSingleton<JellyseerrDownloadProvider>();
+        serviceCollection.AddSingleton<WebhookDownloadProvider>();
+        serviceCollection.AddSingleton<DownloadProviderFactory>();
 
         // Content providers
         serviceCollection.AddSingleton<IContentProvider, RecommendationsProvider>();

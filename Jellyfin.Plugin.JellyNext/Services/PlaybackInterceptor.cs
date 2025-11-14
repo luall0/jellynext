@@ -3,10 +3,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
+using Jellyfin.Plugin.JellyNext.Configuration;
 using Jellyfin.Plugin.JellyNext.Models.Common;
 using Jellyfin.Plugin.JellyNext.Models.Radarr;
 using Jellyfin.Plugin.JellyNext.Models.Sonarr;
 using Jellyfin.Plugin.JellyNext.Models.Trakt;
+using Jellyfin.Plugin.JellyNext.Services.DownloadProviders;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Entities;
@@ -22,8 +24,7 @@ public class PlaybackInterceptor : IHostedService
 {
     private readonly ILogger<PlaybackInterceptor> _logger;
     private readonly ISessionManager _sessionManager;
-    private readonly RadarrService _radarrService;
-    private readonly SonarrService _sonarrService;
+    private readonly DownloadProviderFactory _downloadProviderFactory;
     private readonly ContentCacheService _cacheService;
     private readonly IUserDataManager _userDataManager;
     private readonly IUserManager _userManager;
@@ -33,24 +34,21 @@ public class PlaybackInterceptor : IHostedService
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="sessionManager">The session manager.</param>
-    /// <param name="radarrService">The Radarr service.</param>
-    /// <param name="sonarrService">The Sonarr service.</param>
+    /// <param name="downloadProviderFactory">The download provider factory.</param>
     /// <param name="cacheService">The content cache service.</param>
     /// <param name="userDataManager">The user data manager.</param>
     /// <param name="userManager">The user manager.</param>
     public PlaybackInterceptor(
         ILogger<PlaybackInterceptor> logger,
         ISessionManager sessionManager,
-        RadarrService radarrService,
-        SonarrService sonarrService,
+        DownloadProviderFactory downloadProviderFactory,
         ContentCacheService cacheService,
         IUserDataManager userDataManager,
         IUserManager userManager)
     {
         _logger = logger;
         _sessionManager = sessionManager;
-        _radarrService = radarrService;
-        _sonarrService = sonarrService;
+        _downloadProviderFactory = downloadProviderFactory;
         _cacheService = cacheService;
         _userDataManager = userDataManager;
         _userManager = userManager;
@@ -91,25 +89,34 @@ public class PlaybackInterceptor : IHostedService
 
             _logger.LogInformation("Detected playback attempt for virtual item: {Path}", e.Item.Path);
 
-            // Extract userId from path
+            // Extract userId from path (for fetching cached content)
             var pathMatch = System.Text.RegularExpressions.Regex.Match(
                 e.Item.Path,
                 @"jellynext-virtual[/\\]([a-f0-9-]+)[/\\]");
 
-            if (!pathMatch.Success || !Guid.TryParse(pathMatch.Groups[1].Value, out var itemUserId))
+            Guid contentOwnerId;
+            if (!pathMatch.Success || !Guid.TryParse(pathMatch.Groups[1].Value, out contentOwnerId))
             {
                 _logger.LogWarning("Could not extract user ID from virtual item path: {Path}", e.Item.Path);
-                itemUserId = e.Session.UserId;
+                contentOwnerId = e.Session.UserId;
             }
+
+            // Get the actual player's user ID (for Jellyseerr requests)
+            var playerId = e.Session.UserId;
+
+            _logger.LogInformation(
+                "Virtual item playback - Content owner: {ContentOwner}, Player: {Player}",
+                contentOwnerId,
+                playerId);
 
             // Determine if this is a movie or show based on path
             if (e.Item.Path.Contains("movies_", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleMovieDownload(e, itemUserId);
+                await HandleMovieDownload(e, contentOwnerId, playerId);
             }
             else if (e.Item.Path.Contains("shows_", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleShowDownload(e, itemUserId);
+                await HandleShowDownload(e, contentOwnerId, playerId);
             }
             else
             {
@@ -146,10 +153,10 @@ public class PlaybackInterceptor : IHostedService
         }
     }
 
-    private async Task HandleMovieDownload(PlaybackProgressEventArgs e, Guid itemUserId)
+    private async Task HandleMovieDownload(PlaybackProgressEventArgs e, Guid contentOwnerId, Guid playerId)
     {
         // Extract TMDB ID from filename
-        var fileName = System.IO.Path.GetFileNameWithoutExtension((string?)e.Item?.Path) ?? string.Empty;
+        var fileName = System.IO.Path.GetFileNameWithoutExtension(e.Item?.Path) ?? string.Empty;
         var tmdbMatch = System.Text.RegularExpressions.Regex.Match(fileName, @"\[tmdbid-(\d+)\]$");
 
         if (!tmdbMatch.Success || !int.TryParse(tmdbMatch.Groups[1].Value, out var tmdbId))
@@ -158,8 +165,8 @@ public class PlaybackInterceptor : IHostedService
             return;
         }
 
-        // Get movie details from cache - search across all provider caches
-        var allContent = _cacheService.GetAllUserContent(itemUserId);
+        // Get movie details from cache - search across all provider caches (use content owner's cache)
+        var allContent = _cacheService.GetAllUserContent(contentOwnerId);
         ContentItem? contentItem = null;
 
         foreach (var providerContent in allContent.Values)
@@ -183,36 +190,14 @@ public class PlaybackInterceptor : IHostedService
             contentItem.Year,
             tmdbId);
 
-        // Add movie to Radarr
-        var result = await _radarrService.AddMovieAsync(
-            tmdbId,
-            contentItem.Title,
-            contentItem.Year ?? DateTime.UtcNow.Year);
+        // Get the appropriate download provider and request the movie
+        var downloadProvider = _downloadProviderFactory.GetProvider();
+        var result = await downloadProvider.RequestMovieAsync(contentItem, playerId.ToString());
 
-        // Send message to user
-        var message = result != null
-            ? $"{contentItem.Title} ({contentItem.Year}) has been added to your download queue and will appear in your library shortly."
-            : $"Failed to add {contentItem.Title} ({contentItem.Year}) to download queue. Please check your Radarr configuration.";
-
-        await SendUserNotification(e.Session?.Id, message);
-
-        if (result != null)
-        {
-            _logger.LogInformation(
-                "Successfully added movie to Radarr: {Title} (TMDB: {TmdbId})",
-                contentItem.Title,
-                tmdbId);
-        }
-        else
-        {
-            _logger.LogError(
-                "Failed to add movie to Radarr: {Title} (TMDB: {TmdbId})",
-                contentItem.Title,
-                tmdbId);
-        }
+        await SendUserNotification(e.Session?.Id, result.Message);
     }
 
-    private async Task HandleShowDownload(PlaybackProgressEventArgs e, Guid itemUserId)
+    private async Task HandleShowDownload(PlaybackProgressEventArgs e, Guid contentOwnerId, Guid playerId)
     {
         var path = e.Item?.Path ?? string.Empty;
 
@@ -236,8 +221,8 @@ public class PlaybackInterceptor : IHostedService
             return;
         }
 
-        // Get show details from cache - search across all provider caches
-        var allContent = _cacheService.GetAllUserContent(itemUserId);
+        // Get show details from cache - search across all provider caches (use content owner's cache)
+        var allContent = _cacheService.GetAllUserContent(contentOwnerId);
         ContentItem? contentItem = null;
 
         foreach (var providerContent in allContent.Values)
@@ -255,7 +240,7 @@ public class PlaybackInterceptor : IHostedService
             return;
         }
 
-        // Detect if this is anime (simple heuristic for now - can be enhanced later)
+        // Detect if this is anime
         var isAnime = DetectAnime(contentItem);
 
         _logger.LogInformation(
@@ -266,37 +251,11 @@ public class PlaybackInterceptor : IHostedService
             tvdbId,
             isAnime ? "Anime" : "Standard");
 
-        // Add series to Sonarr with specific season monitored
-        var result = await _sonarrService.AddSeriesAsync(
-            tvdbId,
-            contentItem.Title,
-            contentItem.Year,
-            seasonNumber,
-            isAnime);
+        // Get the appropriate download provider and request the show
+        var downloadProvider = _downloadProviderFactory.GetProvider();
+        var result = await downloadProvider.RequestShowAsync(contentItem, seasonNumber, playerId.ToString(), isAnime);
 
-        // Send message to user
-        var message = result != null
-            ? $"{contentItem.Title} ({contentItem.Year}) - Season {seasonNumber} has been added to your download queue and will appear in your library shortly."
-            : $"Failed to add {contentItem.Title} ({contentItem.Year}) - Season {seasonNumber} to download queue. Please check your Sonarr configuration.";
-
-        await SendUserNotification(e.Session?.Id, message);
-
-        if (result != null)
-        {
-            _logger.LogInformation(
-                "Successfully added show to Sonarr: {Title} - Season {Season} (TVDB: {TvdbId})",
-                contentItem.Title,
-                seasonNumber,
-                tvdbId);
-        }
-        else
-        {
-            _logger.LogError(
-                "Failed to add show to Sonarr: {Title} - Season {Season} (TVDB: {TvdbId})",
-                contentItem.Title,
-                seasonNumber,
-                tvdbId);
-        }
+        await SendUserNotification(e.Session?.Id, result.Message);
     }
 
     private bool DetectAnime(ContentItem item)
