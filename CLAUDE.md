@@ -33,8 +33,8 @@ Jellyfin plugin integrating Trakt-powered discovery with per-user virtual librar
 ### Directory Structure
 ```
 Jellyfin.Plugin.JellyNext/
-├── Api/                    # REST API Controllers (Trakt, Radarr, Sonarr, Jellyseerr, JellyNextLibrary)
-├── Configuration/          # Plugin settings (PluginConfiguration.cs, configPage.html)
+├── Api/                    # REST API Controllers (Trakt, Radarr, Sonarr, Jellyseerr, JellyNextLibrary, Config)
+├── Configuration/          # Plugin settings (PluginConfiguration.cs, configPage.html, tabs/)
 ├── Helpers/                # Utilities (UserHelper.cs)
 ├── Models/                 # Data models organized by service
 │   ├── Common/             # ContentItem, ContentType, ShowCacheEntry, SeasonMetadata, DownloadResult
@@ -87,6 +87,7 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `SonarrController.cs`: Connection test, profile/folder retrieval, TV show/season downloads (native integration)
 - `JellyseerrController.cs`: Connection test, server/profile retrieval for Radarr/Sonarr via Jellyseerr
 - `JellyNextLibraryController.cs`: Query cached content (recommendations, next seasons)
+- `ConfigController.cs`: Serves modular tab HTML/JS from embedded resources (no auth required - page already admin-only)
 
 **Services** (`/Services/`):
 - `TraktApi.cs`: Trakt API client (OAuth, recommendations, trending, watchlist, watched shows, seasons, watch history with auto-pagination)
@@ -116,8 +117,9 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `ScheduledTasks/ContentSyncScheduledTask.cs`: IScheduledTask (6hr interval, calls ContentSyncService, triggers library scan)
 
 **Configuration**:
-- `Configuration/PluginConfiguration.cs`: Persisted settings (Radarr/Sonarr config, TraktUsers[], cache expiration)
-- `Configuration/configPage.html`: Embedded plugin UI
+- `Configuration/PluginConfiguration.cs`: Persisted settings (Radarr/Sonarr config, TraktUsers[], cache expiration). Profile IDs are nullable `int?` to support optional configs.
+- `Configuration/configPage.html`: Main shell (317 lines) with inline shared utilities. Loads tab content via `ConfigController` endpoints.
+- `Configuration/tabs/`: Modular tab files (general.html/js, trakt.html/js, trending.html/js, downloads.html/js) served as embedded resources
 - `Helpers/UserHelper.cs`: Retrieves per-user Trakt config from PluginConfiguration
 
 **Resources**:
@@ -189,6 +191,14 @@ Background: Plugin.PollingTasks[userGuid] = TraktApi.PollForTokenAsync()
 
 ### Configuration Access
 Use `Plugin.Instance?.Configuration` not `Plugin.Instance?.PluginConfiguration` - `BasePlugin<T>` exposes as `Configuration`
+
+### Configuration Page Architecture
+- **Modular tabs**: Each tab isolated in `Configuration/tabs/{name}.html` + `{name}.js` (general, trakt, trending, downloads)
+- **Dynamic loading**: Main page fetches tabs via `ConfigController` (`GET /JellyNext/Config/Tab/{name}` and `/js`) using `ApiClient.getUrl()`
+- **Eager loading**: All tabs loaded on pageshow, populated after users dropdown is ready (avoids race conditions)
+- **Load order critical**: Load tabs → Load config → Load users → Populate UI (ensures dropdowns ready before setting values)
+- **Tab functions**: Each exports `init{Tab}Tab()`, `load{Tab}Settings(config)`, `save{Tab}Settings(config)`
+- **Nullable fields**: Radarr/Sonarr profile IDs are `int?` - validate empty strings before `parseInt()` to avoid `NaN`
 
 ### Content Provider System
 Implement `IContentProvider` + register in `PluginServiceRegistrator` → automatic sync/caching/error isolation

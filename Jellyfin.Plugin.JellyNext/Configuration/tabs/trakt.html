@@ -1,0 +1,129 @@
+<!-- User Trakt Authorization Section -->
+<div class="verticalSection">
+    <h3 class="sectionTitle">Trakt Account Linking</h3>
+    <div class="fieldDescription" style="margin-bottom: 1em;">
+        Each Jellyfin user can link their own Trakt account for personalized recommendations.
+    </div>
+
+    <div class="inputContainer">
+        <label class="inputLabel inputLabelUnfocused" for="UserSelector">Select User:</label>
+        <select is="emby-select" id="UserSelector" name="UserSelector">
+            <option value="">Loading users...</option>
+        </select>
+    </div>
+
+    <div id="AuthorizationStatus" style="margin-top: 1em; display: none;">
+        <div id="NotAuthorizedSection">
+            <div class="fieldDescription" style="margin-bottom: 1em;">
+                This user has not linked their Trakt account yet.
+            </div>
+            <button is="emby-button" type="button" id="AuthorizeBtn" class="raised button-submit">
+                <span>Link Trakt Account</span>
+            </button>
+        </div>
+
+        <div id="AuthorizedSection" style="display: none;">
+            <div class="fieldDescription" style="margin-bottom: 1em; color: #52B54B;">
+                ✓ This user has authorized their Trakt account.
+            </div>
+
+            <!-- Per-User Settings -->
+            <div class="verticalSection" style="margin-top: 1.5em;">
+                <h4 class="sectionTitle" style="font-size: 1em;">Sync Options</h4>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="UserSyncMovieRecommendations" />
+                        <span>Sync Movie Recommendations</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">
+                        Enable movie recommendations for this user
+                    </div>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="UserSyncShowRecommendations" />
+                        <span>Sync Show Recommendations</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">
+                        Enable show recommendations for this user
+                    </div>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="UserSyncNextSeasons" />
+                        <span>Sync Next Seasons</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">
+                        Enable next season suggestions for this user
+                    </div>
+                </div>
+
+                <h4 class="sectionTitle" style="font-size: 1em; margin-top: 1.5em;">Recommendation Limits</h4>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="UserMovieRecommendationsLimit">Movie Recommendations Limit:</label>
+                    <input is="emby-input" type="number" id="UserMovieRecommendationsLimit" name="UserMovieRecommendationsLimit" min="1" max="100" />
+                    <div class="fieldDescription">
+                        Number of movie recommendations to fetch (1-100)
+                    </div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="UserShowRecommendationsLimit">Show Recommendations Limit:</label>
+                    <input is="emby-input" type="number" id="UserShowRecommendationsLimit" name="UserShowRecommendationsLimit" min="1" max="100" />
+                    <div class="fieldDescription">
+                        Number of show recommendations to fetch (1-100)
+                    </div>
+                </div>
+
+                <h4 class="sectionTitle" style="font-size: 1em; margin-top: 1.5em;">Recommendation Filters</h4>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="UserIgnoreCollected" />
+                        <span>Ignore Collected Items</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">
+                        Hide movies and shows you've already added to your Trakt collection from recommendations
+                    </div>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="UserIgnoreWatchlisted" />
+                        <span>Ignore Watchlisted Items</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">
+                        Hide movies and shows in your Trakt watchlist from recommendations
+                    </div>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="UserLimitShowsToSeasonOne" />
+                        <span>Limit Shows to Season 1 Only</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">
+                        Only create stubs for Season 1 of show recommendations. When disabled, stubs are created for all aired seasons. (Recommended for better Jellyfin scan performance)
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5em;">
+                <button is="emby-button" type="button" id="DeauthorizeBtn" class="raised button-cancel">
+                    <span>Unlink Trakt Account</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="AuthorizingSection" style="display: none;">
+            <div class="fieldDescription" style="margin-bottom: 1em;">
+                Please visit <a href="https://trakt.tv/activate" target="_blank" style="color: #00a4dc;">https://trakt.tv/activate</a> and enter this code:
+            </div>
+            <div style="font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 1em 0; color: #00a4dc;" id="UserCodeDisplay">
+                ------
+            </div>
+            <div class="fieldDescription">
+                Waiting for authorization...
+            </div>
+            <div style="margin-top: 1em;">
+                <div class="mdl-spinner mdl-spinner--single-color mdl-js-spinner is-active" id="AuthSpinner"></div>
+            </div>
+        </div>
+    </div>
+</div>

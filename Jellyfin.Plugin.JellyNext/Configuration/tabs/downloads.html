@@ -1,0 +1,424 @@
+<!-- Download Integration Type Selector -->
+<div class="verticalSection">
+    <h3 class="sectionTitle">Download Integration</h3>
+    <div class="fieldDescription" style="margin-bottom: 1em;">
+        Choose how JellyNext should handle media downloads. <strong>Native</strong> uses Radarr/Sonarr directly for
+        granular control. <strong>Jellyseerr</strong> integrates with your existing Jellyseerr instance for unified
+        request management.
+    </div>
+
+    <div class="selectContainer"
+         style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1em; margin-bottom: 1em;">
+        <label class="checkboxContainer"
+               style="padding: 1em; border: 2px solid #444; border-radius: 8px; cursor: pointer; transition: all 0.2s;"
+               id="NativeIntegrationOption">
+            <input type="radio" name="DownloadIntegration" value="0" id="DownloadIntegrationNative" checked
+                   style="margin-right: 0.5em;">
+            <div>
+                <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 0.3em;">🎯 Native (Radarr/Sonarr)</div>
+                <div style="font-size: 0.9em; opacity: 0.8;">Direct integration with Radarr and Sonarr for fine-grained
+                    control over downloads, quality profiles, and root folders.
+                </div>
+            </div>
+        </label>
+
+        <label class="checkboxContainer"
+               style="padding: 1em; border: 2px solid #444; border-radius: 8px; cursor: pointer; transition: all 0.2s;"
+               id="JellyseerrIntegrationOption">
+            <input type="radio" name="DownloadIntegration" value="1" id="DownloadIntegrationJellyseerr"
+                   style="margin-right: 0.5em;">
+            <div>
+                <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 0.3em;">🌟 Jellyseerr</div>
+                <div style="font-size: 0.9em; opacity: 0.8;">Unified request management through Jellyseerr, with
+                    approval workflows and user request tracking.
+                </div>
+            </div>
+        </label>
+
+        <label class="checkboxContainer"
+               style="padding: 1em; border: 2px solid #444; border-radius: 8px; cursor: pointer; transition: all 0.2s;"
+               id="WebhookIntegrationOption">
+            <input type="radio" name="DownloadIntegration" value="2" id="DownloadIntegrationWebhook"
+                   style="margin-right: 0.5em;">
+            <div>
+                <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 0.3em;">🔗 Webhooks</div>
+                <div style="font-size: 0.9em; opacity: 0.8;">Custom HTTP webhooks for complete flexibility. Configure
+                    URLs, headers, and payloads with dynamic placeholders.
+                </div>
+            </div>
+        </label>
+    </div>
+</div>
+
+<!-- Jellyseerr Settings -->
+<div class="verticalSection" id="JellyseerrSection" style="display: none;">
+    <h3 class="sectionTitle">Jellyseerr Settings</h3>
+    <div class="inputContainer">
+        <label class="inputLabel inputLabelUnfocused" for="JellyseerrUrl">Jellyseerr URL:</label>
+        <input is="emby-input" type="text" id="JellyseerrUrl" name="JellyseerrUrl" placeholder="http://localhost:5055"/>
+    </div>
+    <div class="inputContainer">
+        <label class="inputLabel inputLabelUnfocused" for="JellyseerrApiKey">Jellyseerr API Key:</label>
+        <input is="emby-input" type="text" id="JellyseerrApiKey" name="JellyseerrApiKey"/>
+        <div class="fieldDescription">
+            Find your API key in Jellyseerr under Settings → General → API Key
+        </div>
+    </div>
+    <div style="margin-top: 1em;">
+        <button is="emby-button" type="button" id="TestJellyseerrBtn" class="raised button-submit">
+            <span>Test Connection</span>
+        </button>
+    </div>
+    <div id="JellyseerrConnectionStatus" style="margin-top: 1em; display: none;"></div>
+
+    <!-- Radarr Server Selection -->
+    <div id="JellyseerrRadarrSection" style="display: none; margin-top: 1.5em;">
+        <h4 style="margin-bottom: 0.5em;">Radarr Configuration</h4>
+        <div class="checkboxContainer checkboxContainer-withDescription">
+            <label>
+                <input is="emby-checkbox" type="checkbox" id="UseJellyseerrRadarrDefaults"/>
+                <span>Use Jellyseerr Default Config</span>
+            </label>
+            <div class="fieldDescription checkboxFieldDescription">
+                Use Jellyseerr's default Radarr server and profile settings. Uncheck to manually configure.
+            </div>
+        </div>
+        <div id="JellyseerrRadarrManualConfig" style="display: none; margin-top: 1em;">
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="JellyseerrRadarrServer">Radarr Server:</label>
+                <select is="emby-select" id="JellyseerrRadarrServer" name="JellyseerrRadarrServer">
+                    <option value="">Select a Radarr server...</option>
+                </select>
+                <div class="fieldDescription">
+                    The Radarr server to use for movie requests
+                </div>
+            </div>
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="JellyseerrRadarrProfile">Quality Profile:</label>
+                <select is="emby-select" id="JellyseerrRadarrProfile" name="JellyseerrRadarrProfile">
+                    <option value="">Select a quality profile...</option>
+                </select>
+                <div class="fieldDescription">
+                    Quality profile to use for movie downloads
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sonarr Server Selection -->
+    <div id="JellyseerrSonarrSection" style="display: none; margin-top: 1.5em;">
+        <h4 style="margin-bottom: 0.5em;">Sonarr Configuration</h4>
+        <div class="checkboxContainer checkboxContainer-withDescription">
+            <label>
+                <input is="emby-checkbox" type="checkbox" id="UseJellyseerrSonarrDefaults"/>
+                <span>Use Jellyseerr Default Config</span>
+            </label>
+            <div class="fieldDescription checkboxFieldDescription">
+                Use Jellyseerr's default Sonarr server and profile settings. Uncheck to manually configure.
+            </div>
+        </div>
+        <div id="JellyseerrSonarrManualConfig" style="display: none; margin-top: 1em;">
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="JellyseerrSonarrServer">Sonarr Server:</label>
+                <select is="emby-select" id="JellyseerrSonarrServer" name="JellyseerrSonarrServer">
+                    <option value="">Select a Sonarr server...</option>
+                </select>
+                <div class="fieldDescription">
+                    The Sonarr server to use for TV show requests
+                </div>
+            </div>
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="JellyseerrSonarrProfile">Quality Profile:</label>
+                <select is="emby-select" id="JellyseerrSonarrProfile" name="JellyseerrSonarrProfile">
+                    <option value="">Select a quality profile...</option>
+                </select>
+                <div class="fieldDescription">
+                    Quality profile to use for TV show downloads
+                </div>
+            </div>
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="JellyseerrSonarrAnimeProfile">Anime Quality Profile
+                    (Optional):</label>
+                <select is="emby-select" id="JellyseerrSonarrAnimeProfile" name="JellyseerrSonarrAnimeProfile">
+                    <option value="">Use same profile as regular TV shows</option>
+                </select>
+                <div class="fieldDescription">
+                    Optional separate quality profile for anime downloads
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Webhook Integration Section -->
+<div class="verticalSection" id="WebhookSection" style="display: none;">
+    <h3 class="sectionTitle">Webhook Settings</h3>
+    <div class="fieldDescription"
+         style="margin-bottom: 1.5em; padding: 0.75em; background-color: rgba(0, 164, 220, 0.1); border-left: 3px solid #00a4dc;">
+        Configure custom webhooks for movie and TV show downloads. Use placeholders to inject dynamic values into URLs,
+        headers, and payloads.
+    </div>
+
+    <!-- HTTP Method Selection -->
+    <div class="inputContainer">
+        <label class="inputLabel inputLabelUnfocused" for="WebhookMethod">HTTP Method:</label>
+        <select is="emby-select" id="WebhookMethod" name="WebhookMethod">
+            <option value="GET">GET</option>
+            <option value="POST" selected>POST</option>
+            <option value="PUT">PUT</option>
+            <option value="PATCH">PATCH</option>
+        </select>
+        <div class="fieldDescription">
+            HTTP method to use for webhook requests
+        </div>
+    </div>
+
+    <!-- Movie Webhook Configuration -->
+    <div style="margin-top: 2em; padding: 1.5em; background-color: rgba(0, 0, 0, 0.15); border-radius: 8px;">
+        <h4 style="margin-bottom: 1em; display: flex; align-items: center; gap: 0.5em;">
+            🎬 Movie Webhooks
+        </h4>
+
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="WebhookMovieUrl">Webhook URL:</label>
+            <input is="emby-input" type="text" id="WebhookMovieUrl" name="WebhookMovieUrl"
+                   placeholder="https://example.com/api/download/movie?tmdb={tmdbId}"/>
+            <div class="fieldDescription">
+                Available placeholders: <code>{tmdbId}</code>, <code>{imdbId}</code>, <code>{title}</code>,
+                <code>{year}</code>, <code>{jellyfinUserId}</code>
+            </div>
+        </div>
+
+        <!-- Custom Headers -->
+        <div style="margin-top: 1.5em;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75em;">
+                <label style="font-weight: 500; font-size: 0.95em;">Custom Headers:</label>
+                <button is="emby-button" type="button" id="AddMovieHeaderBtn" class="raised button-submit"
+                        style="padding: 0.4em 1em; font-size: 0.85em;">
+                    <span>+ Add Header</span>
+                </button>
+            </div>
+            <div id="MovieHeadersList" style="display: flex; flex-direction: column; gap: 0.75em;">
+                <!-- Dynamic headers will be added here -->
+            </div>
+            <div class="fieldDescription" style="margin-top: 0.5em;">
+                Header values support placeholders. Common headers: Authorization, Content-Type, X-Api-Key
+            </div>
+        </div>
+
+        <!-- Payload Template -->
+        <div style="margin-top: 1.5em;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75em;">
+                <label style="font-weight: 500; font-size: 0.95em;">Request Payload:</label>
+                <button is="emby-button" type="button" id="ResetMoviePayloadBtn" class="raised"
+                        style="padding: 0.4em 1em; font-size: 0.85em;">
+                    <span>Reset to Default</span>
+                </button>
+            </div>
+            <textarea is="emby-input" id="WebhookMoviePayload" name="WebhookMoviePayload" rows="8"
+                      style="font-family: 'Courier New', monospace; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 1em; color: white"></textarea>
+            <div class="fieldDescription" style="margin-top: 0.5em;">
+                JSON template for the request body. Click placeholder names below to insert them:
+            </div>
+            <div style="margin-top: 0.5em; display: flex; flex-wrap: wrap; gap: 0.5em;">
+                <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{tmdbId}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {tmdbId}
+                </button>
+                <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{imdbId}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {imdbId}
+                </button>
+                <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{title}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {title}
+                </button>
+                <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{year}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {year}
+                </button>
+                <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{jellyfinUserId}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {jellyfinUserId}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TV Show Webhook Configuration -->
+    <div style="margin-top: 2em; padding: 1.5em; background-color: rgba(0, 0, 0, 0.15); border-radius: 8px;">
+        <h4 style="margin-bottom: 1em; display: flex; align-items: center; gap: 0.5em;">
+            📺 TV Show Webhooks
+        </h4>
+
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="WebhookShowUrl">Webhook URL:</label>
+            <input is="emby-input" type="text" id="WebhookShowUrl" name="WebhookShowUrl"
+                   placeholder="https://example.com/api/download/show?tvdb={tvdbId}&season={seasonNumber}"/>
+            <div class="fieldDescription">
+                Available placeholders: <code>{tvdbId}</code>, <code>{tmdbId}</code>, <code>{imdbId}</code>, <code>{title}</code>,
+                <code>{year}</code>, <code>{seasonNumber}</code>, <code>{isAnime}</code>, <code>{jellyfinUserId}</code>
+            </div>
+        </div>
+
+        <!-- Custom Headers -->
+        <div style="margin-top: 1.5em;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75em;">
+                <label style="font-weight: 500; font-size: 0.95em;">Custom Headers:</label>
+                <button is="emby-button" type="button" id="AddShowHeaderBtn" class="raised button-submit"
+                        style="padding: 0.4em 1em; font-size: 0.85em;">
+                    <span>+ Add Header</span>
+                </button>
+            </div>
+            <div id="ShowHeadersList" style="display: flex; flex-direction: column; gap: 0.75em;">
+                <!-- Dynamic headers will be added here -->
+            </div>
+            <div class="fieldDescription" style="margin-top: 0.5em;">
+                Header values support placeholders. Common headers: Authorization, Content-Type, X-Api-Key
+            </div>
+        </div>
+
+        <!-- Payload Template -->
+        <div style="margin-top: 1.5em;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75em;">
+                <label style="font-weight: 500; font-size: 0.95em;">Request Payload:</label>
+                <button is="emby-button" type="button" id="ResetShowPayloadBtn" class="raised"
+                        style="padding: 0.4em 1em; font-size: 0.85em;">
+                    <span>Reset to Default</span>
+                </button>
+            </div>
+            <textarea is="emby-input" id="WebhookShowPayload" name="WebhookShowPayload" rows="10"
+                      style="font-family: 'Courier New', monospace; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 1em; color: white"></textarea>
+            <div class="fieldDescription" style="margin-top: 0.5em;">
+                JSON template for the request body. Click placeholder names below to insert them:
+            </div>
+            <div style="margin-top: 0.5em; display: flex; flex-wrap: wrap; gap: 0.5em;">
+                <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{tvdbId}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {tvdbId}
+                </button>
+                <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{tmdbId}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {tmdbId}
+                </button>
+                <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{imdbId}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {imdbId}
+                </button>
+                <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{title}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {title}
+                </button>
+                <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{year}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {year}
+                </button>
+                <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{seasonNumber}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {seasonNumber}
+                </button>
+                <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{isAnime}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {isAnime}
+                </button>
+                <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{jellyfinUserId}"
+                        style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">
+                    {jellyfinUserId}
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Native Integration Section -->
+<div id="NativeIntegrationSection">
+    <!-- Radarr Settings -->
+    <div class="verticalSection">
+        <h3 class="sectionTitle">Radarr Settings</h3>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="RadarrUrl">Radarr URL:</label>
+            <input is="emby-input" type="text" id="RadarrUrl" name="RadarrUrl" placeholder="http://localhost:7878"/>
+        </div>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="RadarrApiKey">Radarr API Key:</label>
+            <input is="emby-input" type="text" id="RadarrApiKey" name="RadarrApiKey"/>
+        </div>
+        <div style="margin-top: 1em;">
+            <button is="emby-button" type="button" id="TestRadarrBtn" class="raised button-submit">
+                <span>Test Connection</span>
+            </button>
+        </div>
+        <div id="RadarrConnectionStatus" style="margin-top: 1em; display: none;"></div>
+        <div id="RadarrOptionsSection" style="display: none;">
+            <div class="inputContainer" style="margin-top: 1em;">
+                <label class="inputLabel inputLabelUnfocused" for="RadarrQualityProfile">Quality Profile:</label>
+                <select is="emby-select" id="RadarrQualityProfile" name="RadarrQualityProfile">
+                    <option value="">Select a quality profile...</option>
+                </select>
+                <div class="fieldDescription">
+                    Quality profile to use when downloading movies
+                </div>
+            </div>
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="RadarrRootFolder">Root Folder:</label>
+                <select is="emby-select" id="RadarrRootFolder" name="RadarrRootFolder">
+                    <option value="">Select a root folder...</option>
+                </select>
+                <div class="fieldDescription">
+                    Folder where downloaded movies will be stored
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sonarr Settings -->
+    <div class="verticalSection">
+        <h3 class="sectionTitle">Sonarr Settings</h3>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="SonarrUrl">Sonarr URL:</label>
+            <input is="emby-input" type="text" id="SonarrUrl" name="SonarrUrl" placeholder="http://localhost:8989"/>
+        </div>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="SonarrApiKey">Sonarr API Key:</label>
+            <input is="emby-input" type="text" id="SonarrApiKey" name="SonarrApiKey"/>
+        </div>
+        <div style="margin-top: 1em;">
+            <button is="emby-button" type="button" id="TestSonarrBtn" class="raised button-submit">
+                <span>Test Connection</span>
+            </button>
+        </div>
+        <div id="SonarrConnectionStatus" style="margin-top: 1em; display: none;"></div>
+        <div id="SonarrOptionsSection" style="display: none;">
+            <div class="inputContainer" style="margin-top: 1em;">
+                <label class="inputLabel inputLabelUnfocused" for="SonarrQualityProfile">Quality Profile:</label>
+                <select is="emby-select" id="SonarrQualityProfile" name="SonarrQualityProfile">
+                    <option value="">Select a quality profile...</option>
+                </select>
+                <div class="fieldDescription">
+                    Quality profile to use when downloading TV shows
+                </div>
+            </div>
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="SonarrRootFolder">Root Folder:</label>
+                <select is="emby-select" id="SonarrRootFolder" name="SonarrRootFolder">
+                    <option value="">Select a root folder...</option>
+                </select>
+                <div class="fieldDescription">
+                    Folder where downloaded TV shows will be stored
+                </div>
+            </div>
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="SonarrAnimeRootFolder">Anime Root Folder
+                    (Optional):</label>
+                <select is="emby-select" id="SonarrAnimeRootFolder" name="SonarrAnimeRootFolder">
+                    <option value="">Same as regular shows...</option>
+                </select>
+                <div class="fieldDescription">
+                    Optional separate folder for anime shows. If not specified, uses the regular root folder.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- End Native Integration Section -->

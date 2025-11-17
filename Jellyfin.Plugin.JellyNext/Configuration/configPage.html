@@ -37,583 +37,11 @@
                         <a type="button" class="emby-button" data-index="3" data-role="button">Downloads</a>
                     </div>
 
-                    <!-- Tab 1: General Settings -->
-                    <div class="tabContent" data-index="0">
-                        <!-- Cache Settings -->
-                        <div class="verticalSection">
-                            <h3 class="sectionTitle">Cache Settings</h3>
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="CacheExpirationHours">Content Cache Expiration (hours):</label>
-                                <input is="emby-input" type="number" id="CacheExpirationHours" name="CacheExpirationHours" min="1" max="168" />
-                                <div class="fieldDescription">
-                                    How long cached content remains valid before requiring a fresh fetch from Trakt (1-168 hours).
-                                    Cached data is served instantly when browsing virtual libraries, avoiding API rate limits and improving performance.
-                                    Configure sync schedule in Dashboard → Scheduled Tasks → "Sync Trakt Content".
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Playback Settings -->
-                        <div class="verticalSection">
-                            <h3 class="sectionTitle">Playback Settings</h3>
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label>
-                                    <input is="emby-checkbox" type="checkbox" id="UseShortDummyVideo" />
-                                    <span>Use Short Dummy Video (2 seconds)</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">
-                                    When enabled, virtual items use a 2-second dummy video that stops playback automatically on clients that don't support API playback stopping.
-                                    When disabled, uses a 1-hour dummy video (prevents "watched" status but requires manual stop).
-                                    Default: enabled.
-                                </div>
-                            </div>
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="PlaybackStopDelaySeconds">Playback Stop Delay (seconds):</label>
-                                <input is="emby-input" type="number" id="PlaybackStopDelaySeconds" name="PlaybackStopDelaySeconds" min="0" max="30" />
-                                <div class="fieldDescription">
-                                    Delay in seconds before stopping playback of virtual items (0-30 seconds, default: 2).
-                                    Some clients need time before playback can be stopped reliably.
-                                    Increase this value if you experience playback issues on certain clients.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tab 2: Trakt Settings -->
-                    <div class="tabContent" data-index="1" style="display: none;">
-                        <!-- User Trakt Authorization Section -->
-                    <div class="verticalSection">
-                        <h3 class="sectionTitle">Trakt Account Linking</h3>
-                        <div class="fieldDescription" style="margin-bottom: 1em;">
-                            Each Jellyfin user can link their own Trakt account for personalized recommendations.
-                        </div>
-
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="UserSelector">Select User:</label>
-                            <select is="emby-select" id="UserSelector" name="UserSelector">
-                                <option value="">Loading users...</option>
-                            </select>
-                        </div>
-
-                        <div id="AuthorizationStatus" style="margin-top: 1em; display: none;">
-                            <div id="NotAuthorizedSection">
-                                <div class="fieldDescription" style="margin-bottom: 1em;">
-                                    This user has not linked their Trakt account yet.
-                                </div>
-                                <button is="emby-button" type="button" id="AuthorizeBtn" class="raised button-submit">
-                                    <span>Link Trakt Account</span>
-                                </button>
-                            </div>
-
-                            <div id="AuthorizedSection" style="display: none;">
-                                <div class="fieldDescription" style="margin-bottom: 1em; color: #52B54B;">
-                                    ✓ This user has authorized their Trakt account.
-                                </div>
-
-                                <!-- Per-User Settings -->
-                                <div class="verticalSection" style="margin-top: 1.5em;">
-                                    <h4 class="sectionTitle" style="font-size: 1em;">Sync Options</h4>
-                                    <div class="checkboxContainer checkboxContainer-withDescription">
-                                        <label>
-                                            <input is="emby-checkbox" type="checkbox" id="UserSyncMovieRecommendations" />
-                                            <span>Sync Movie Recommendations</span>
-                                        </label>
-                                        <div class="fieldDescription checkboxFieldDescription">
-                                            Enable movie recommendations for this user
-                                        </div>
-                                    </div>
-                                    <div class="checkboxContainer checkboxContainer-withDescription">
-                                        <label>
-                                            <input is="emby-checkbox" type="checkbox" id="UserSyncShowRecommendations" />
-                                            <span>Sync Show Recommendations</span>
-                                        </label>
-                                        <div class="fieldDescription checkboxFieldDescription">
-                                            Enable show recommendations for this user
-                                        </div>
-                                    </div>
-                                    <div class="checkboxContainer checkboxContainer-withDescription">
-                                        <label>
-                                            <input is="emby-checkbox" type="checkbox" id="UserSyncNextSeasons" />
-                                            <span>Sync Next Seasons</span>
-                                        </label>
-                                        <div class="fieldDescription checkboxFieldDescription">
-                                            Enable next season suggestions for this user
-                                        </div>
-                                    </div>
-
-                                    <h4 class="sectionTitle" style="font-size: 1em; margin-top: 1.5em;">Recommendation Limits</h4>
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="UserMovieRecommendationsLimit">Movie Recommendations Limit:</label>
-                                        <input is="emby-input" type="number" id="UserMovieRecommendationsLimit" name="UserMovieRecommendationsLimit" min="1" max="100" />
-                                        <div class="fieldDescription">
-                                            Number of movie recommendations to fetch (1-100)
-                                        </div>
-                                    </div>
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="UserShowRecommendationsLimit">Show Recommendations Limit:</label>
-                                        <input is="emby-input" type="number" id="UserShowRecommendationsLimit" name="UserShowRecommendationsLimit" min="1" max="100" />
-                                        <div class="fieldDescription">
-                                            Number of show recommendations to fetch (1-100)
-                                        </div>
-                                    </div>
-
-                                    <h4 class="sectionTitle" style="font-size: 1em; margin-top: 1.5em;">Recommendation Filters</h4>
-                                    <div class="checkboxContainer checkboxContainer-withDescription">
-                                        <label>
-                                            <input is="emby-checkbox" type="checkbox" id="UserIgnoreCollected" />
-                                            <span>Ignore Collected Items</span>
-                                        </label>
-                                        <div class="fieldDescription checkboxFieldDescription">
-                                            Hide movies and shows you've already added to your Trakt collection from recommendations
-                                        </div>
-                                    </div>
-                                    <div class="checkboxContainer checkboxContainer-withDescription">
-                                        <label>
-                                            <input is="emby-checkbox" type="checkbox" id="UserIgnoreWatchlisted" />
-                                            <span>Ignore Watchlisted Items</span>
-                                        </label>
-                                        <div class="fieldDescription checkboxFieldDescription">
-                                            Hide movies and shows in your Trakt watchlist from recommendations
-                                        </div>
-                                    </div>
-                                    <div class="checkboxContainer checkboxContainer-withDescription">
-                                        <label>
-                                            <input is="emby-checkbox" type="checkbox" id="UserLimitShowsToSeasonOne" />
-                                            <span>Limit Shows to Season 1 Only</span>
-                                        </label>
-                                        <div class="fieldDescription checkboxFieldDescription">
-                                            Only create stubs for Season 1 of show recommendations. When disabled, stubs are created for all aired seasons. (Recommended for better Jellyfin scan performance)
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style="margin-top: 1.5em;">
-                                    <button is="emby-button" type="button" id="DeauthorizeBtn" class="raised button-cancel">
-                                        <span>Unlink Trakt Account</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div id="AuthorizingSection" style="display: none;">
-                                <div class="fieldDescription" style="margin-bottom: 1em;">
-                                    Please visit <a href="https://trakt.tv/activate" target="_blank" style="color: #00a4dc;">https://trakt.tv/activate</a> and enter this code:
-                                </div>
-                                <div style="font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 1em 0; color: #00a4dc;" id="UserCodeDisplay">
-                                    ------
-                                </div>
-                                <div class="fieldDescription">
-                                    Waiting for authorization...
-                                </div>
-                                <div style="margin-top: 1em;">
-                                    <div class="mdl-spinner mdl-spinner--single-color mdl-js-spinner is-active" id="AuthSpinner"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    </div>
-
-                    <!-- Tab 3: Trending -->
-                    <div class="tabContent" data-index="2" style="display: none;">
-                        <!-- Trending Movies Settings -->
-                        <div class="verticalSection">
-                            <h3 class="sectionTitle">Trending Movies (Global)</h3>
-                            <div class="fieldDescription" style="margin-bottom: 1em;">
-                                Configure global trending movies that appear for all users.
-                            </div>
-
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label>
-                                    <input is="emby-checkbox" type="checkbox" id="TrendingMoviesEnabled" />
-                                    <span>Enable Trending Movies</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">
-                                    Show trending movies in a global library (not per-user)
-                                </div>
-                            </div>
-
-                            <div id="TrendingMoviesOptions" style="display: none; margin-top: 1em;">
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="TrendingMoviesUser">Source User:</label>
-                                    <select is="emby-select" id="TrendingMoviesUser" name="TrendingMoviesUser">
-                                        <option value="">Select user for Trakt access...</option>
-                                    </select>
-                                    <div class="fieldDescription">
-                                        Which user's Trakt account to use for fetching trending movies
-                                    </div>
-                                </div>
-
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="TrendingMoviesLimit">Trending Movies Limit:</label>
-                                    <input is="emby-input" type="number" id="TrendingMoviesLimit" name="TrendingMoviesLimit" min="1" max="100" />
-                                    <div class="fieldDescription">
-                                        Number of trending movies to fetch (1-100, default: 50)
-                                    </div>
-                                </div>
-
-                                <div class="fieldDescription" style="margin-top: 1em; padding: 0.75em; background-color: rgba(0, 164, 220, 0.1); border-left: 3px solid #00a4dc;">
-                                    <strong>Library Setup:</strong> After enabling, add a Jellyfin library pointing to:<br>
-                                    <code style="background-color: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">jellynext-virtual/global/movies_trending</code>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tab 4: Download Settings -->
-                    <div class="tabContent" data-index="3" style="display: none;">
-                        <!-- Download Integration Type Selector -->
-                        <div class="verticalSection">
-                            <h3 class="sectionTitle">Download Integration</h3>
-                            <div class="fieldDescription" style="margin-bottom: 1em;">
-                                Choose how JellyNext should handle media downloads. <strong>Native</strong> uses Radarr/Sonarr directly for granular control. <strong>Jellyseerr</strong> integrates with your existing Jellyseerr instance for unified request management.
-                            </div>
-
-                            <div class="selectContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1em; margin-bottom: 1em;">
-                                <label class="checkboxContainer" style="padding: 1em; border: 2px solid #444; border-radius: 8px; cursor: pointer; transition: all 0.2s;" id="NativeIntegrationOption">
-                                    <input type="radio" name="DownloadIntegration" value="0" id="DownloadIntegrationNative" checked style="margin-right: 0.5em;">
-                                    <div>
-                                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 0.3em;">🎯 Native (Radarr/Sonarr)</div>
-                                        <div style="font-size: 0.9em; opacity: 0.8;">Direct integration with Radarr and Sonarr for fine-grained control over downloads, quality profiles, and root folders.</div>
-                                    </div>
-                                </label>
-
-                                <label class="checkboxContainer" style="padding: 1em; border: 2px solid #444; border-radius: 8px; cursor: pointer; transition: all 0.2s;" id="JellyseerrIntegrationOption">
-                                    <input type="radio" name="DownloadIntegration" value="1" id="DownloadIntegrationJellyseerr" style="margin-right: 0.5em;">
-                                    <div>
-                                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 0.3em;">🌟 Jellyseerr</div>
-                                        <div style="font-size: 0.9em; opacity: 0.8;">Unified request management through Jellyseerr, with approval workflows and user request tracking.</div>
-                                    </div>
-                                </label>
-
-                                <label class="checkboxContainer" style="padding: 1em; border: 2px solid #444; border-radius: 8px; cursor: pointer; transition: all 0.2s;" id="WebhookIntegrationOption">
-                                    <input type="radio" name="DownloadIntegration" value="2" id="DownloadIntegrationWebhook" style="margin-right: 0.5em;">
-                                    <div>
-                                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 0.3em;">🔗 Webhooks</div>
-                                        <div style="font-size: 0.9em; opacity: 0.8;">Custom HTTP webhooks for complete flexibility. Configure URLs, headers, and payloads with dynamic placeholders.</div>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- Jellyseerr Settings -->
-                        <div class="verticalSection" id="JellyseerrSection" style="display: none;">
-                            <h3 class="sectionTitle">Jellyseerr Settings</h3>
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="JellyseerrUrl">Jellyseerr URL:</label>
-                                <input is="emby-input" type="text" id="JellyseerrUrl" name="JellyseerrUrl" placeholder="http://localhost:5055" />
-                            </div>
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="JellyseerrApiKey">Jellyseerr API Key:</label>
-                                <input is="emby-input" type="text" id="JellyseerrApiKey" name="JellyseerrApiKey" />
-                                <div class="fieldDescription">
-                                    Find your API key in Jellyseerr under Settings → General → API Key
-                                </div>
-                            </div>
-                            <div style="margin-top: 1em;">
-                                <button is="emby-button" type="button" id="TestJellyseerrBtn" class="raised button-submit">
-                                    <span>Test Connection</span>
-                                </button>
-                            </div>
-                            <div id="JellyseerrConnectionStatus" style="margin-top: 1em; display: none;"></div>
-
-                            <!-- Radarr Server Selection -->
-                            <div id="JellyseerrRadarrSection" style="display: none; margin-top: 1.5em;">
-                                <h4 style="margin-bottom: 0.5em;">Radarr Configuration</h4>
-                                <div class="checkboxContainer checkboxContainer-withDescription">
-                                    <label>
-                                        <input is="emby-checkbox" type="checkbox" id="UseJellyseerrRadarrDefaults" />
-                                        <span>Use Jellyseerr Default Config</span>
-                                    </label>
-                                    <div class="fieldDescription checkboxFieldDescription">
-                                        Use Jellyseerr's default Radarr server and profile settings. Uncheck to manually configure.
-                                    </div>
-                                </div>
-                                <div id="JellyseerrRadarrManualConfig" style="display: none; margin-top: 1em;">
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="JellyseerrRadarrServer">Radarr Server:</label>
-                                        <select is="emby-select" id="JellyseerrRadarrServer" name="JellyseerrRadarrServer">
-                                            <option value="">Select a Radarr server...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            The Radarr server to use for movie requests
-                                        </div>
-                                    </div>
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="JellyseerrRadarrProfile">Quality Profile:</label>
-                                        <select is="emby-select" id="JellyseerrRadarrProfile" name="JellyseerrRadarrProfile">
-                                            <option value="">Select a quality profile...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            Quality profile to use for movie downloads
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Sonarr Server Selection -->
-                            <div id="JellyseerrSonarrSection" style="display: none; margin-top: 1.5em;">
-                                <h4 style="margin-bottom: 0.5em;">Sonarr Configuration</h4>
-                                <div class="checkboxContainer checkboxContainer-withDescription">
-                                    <label>
-                                        <input is="emby-checkbox" type="checkbox" id="UseJellyseerrSonarrDefaults" />
-                                        <span>Use Jellyseerr Default Config</span>
-                                    </label>
-                                    <div class="fieldDescription checkboxFieldDescription">
-                                        Use Jellyseerr's default Sonarr server and profile settings. Uncheck to manually configure.
-                                    </div>
-                                </div>
-                                <div id="JellyseerrSonarrManualConfig" style="display: none; margin-top: 1em;">
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="JellyseerrSonarrServer">Sonarr Server:</label>
-                                        <select is="emby-select" id="JellyseerrSonarrServer" name="JellyseerrSonarrServer">
-                                            <option value="">Select a Sonarr server...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            The Sonarr server to use for TV show requests
-                                        </div>
-                                    </div>
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="JellyseerrSonarrProfile">Quality Profile:</label>
-                                        <select is="emby-select" id="JellyseerrSonarrProfile" name="JellyseerrSonarrProfile">
-                                            <option value="">Select a quality profile...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            Quality profile to use for TV show downloads
-                                        </div>
-                                    </div>
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="JellyseerrSonarrAnimeProfile">Anime Quality Profile (Optional):</label>
-                                        <select is="emby-select" id="JellyseerrSonarrAnimeProfile" name="JellyseerrSonarrAnimeProfile">
-                                            <option value="">Use same profile as regular TV shows</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            Optional separate quality profile for anime downloads
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Webhook Integration Section -->
-                        <div class="verticalSection" id="WebhookSection" style="display: none;">
-                            <h3 class="sectionTitle">Webhook Settings</h3>
-                            <div class="fieldDescription" style="margin-bottom: 1.5em; padding: 0.75em; background-color: rgba(0, 164, 220, 0.1); border-left: 3px solid #00a4dc;">
-                                Configure custom webhooks for movie and TV show downloads. Use placeholders to inject dynamic values into URLs, headers, and payloads.
-                            </div>
-
-                            <!-- HTTP Method Selection -->
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="WebhookMethod">HTTP Method:</label>
-                                <select is="emby-select" id="WebhookMethod" name="WebhookMethod">
-                                    <option value="GET">GET</option>
-                                    <option value="POST" selected>POST</option>
-                                    <option value="PUT">PUT</option>
-                                    <option value="PATCH">PATCH</option>
-                                </select>
-                                <div class="fieldDescription">
-                                    HTTP method to use for webhook requests
-                                </div>
-                            </div>
-
-                            <!-- Movie Webhook Configuration -->
-                            <div style="margin-top: 2em; padding: 1.5em; background-color: rgba(0, 0, 0, 0.15); border-radius: 8px;">
-                                <h4 style="margin-bottom: 1em; display: flex; align-items: center; gap: 0.5em;">
-                                    🎬 Movie Webhooks
-                                </h4>
-
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="WebhookMovieUrl">Webhook URL:</label>
-                                    <input is="emby-input" type="text" id="WebhookMovieUrl" name="WebhookMovieUrl" placeholder="https://example.com/api/download/movie?tmdb={tmdbId}" />
-                                    <div class="fieldDescription">
-                                        Available placeholders: <code>{tmdbId}</code>, <code>{imdbId}</code>, <code>{title}</code>, <code>{year}</code>, <code>{jellyfinUserId}</code>
-                                    </div>
-                                </div>
-
-                                <!-- Custom Headers -->
-                                <div style="margin-top: 1.5em;">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75em;">
-                                        <label style="font-weight: 500; font-size: 0.95em;">Custom Headers:</label>
-                                        <button is="emby-button" type="button" id="AddMovieHeaderBtn" class="raised button-submit" style="padding: 0.4em 1em; font-size: 0.85em;">
-                                            <span>+ Add Header</span>
-                                        </button>
-                                    </div>
-                                    <div id="MovieHeadersList" style="display: flex; flex-direction: column; gap: 0.75em;">
-                                        <!-- Dynamic headers will be added here -->
-                                    </div>
-                                    <div class="fieldDescription" style="margin-top: 0.5em;">
-                                        Header values support placeholders. Common headers: Authorization, Content-Type, X-Api-Key
-                                    </div>
-                                </div>
-
-                                <!-- Payload Template -->
-                                <div style="margin-top: 1.5em;">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75em;">
-                                        <label style="font-weight: 500; font-size: 0.95em;">Request Payload:</label>
-                                        <button is="emby-button" type="button" id="ResetMoviePayloadBtn" class="raised" style="padding: 0.4em 1em; font-size: 0.85em;">
-                                            <span>Reset to Default</span>
-                                        </button>
-                                    </div>
-                                    <textarea is="emby-input" id="WebhookMoviePayload" name="WebhookMoviePayload" rows="8" style="font-family: 'Courier New', monospace; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 1em; color: white"></textarea>
-                                    <div class="fieldDescription" style="margin-top: 0.5em;">
-                                        JSON template for the request body. Click placeholder names below to insert them:
-                                    </div>
-                                    <div style="margin-top: 0.5em; display: flex; flex-wrap: wrap; gap: 0.5em;">
-                                        <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{tmdbId}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{tmdbId}</button>
-                                        <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{imdbId}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{imdbId}</button>
-                                        <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{title}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{title}</button>
-                                        <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{year}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{year}</button>
-                                        <button type="button" class="placeholder-btn movie-placeholder" data-placeholder="{jellyfinUserId}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{jellyfinUserId}</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- TV Show Webhook Configuration -->
-                            <div style="margin-top: 2em; padding: 1.5em; background-color: rgba(0, 0, 0, 0.15); border-radius: 8px;">
-                                <h4 style="margin-bottom: 1em; display: flex; align-items: center; gap: 0.5em;">
-                                    📺 TV Show Webhooks
-                                </h4>
-
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="WebhookShowUrl">Webhook URL:</label>
-                                    <input is="emby-input" type="text" id="WebhookShowUrl" name="WebhookShowUrl" placeholder="https://example.com/api/download/show?tvdb={tvdbId}&season={seasonNumber}" />
-                                    <div class="fieldDescription">
-                                        Available placeholders: <code>{tvdbId}</code>, <code>{tmdbId}</code>, <code>{imdbId}</code>, <code>{title}</code>, <code>{year}</code>, <code>{seasonNumber}</code>, <code>{isAnime}</code>, <code>{jellyfinUserId}</code>
-                                    </div>
-                                </div>
-
-                                <!-- Custom Headers -->
-                                <div style="margin-top: 1.5em;">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75em;">
-                                        <label style="font-weight: 500; font-size: 0.95em;">Custom Headers:</label>
-                                        <button is="emby-button" type="button" id="AddShowHeaderBtn" class="raised button-submit" style="padding: 0.4em 1em; font-size: 0.85em;">
-                                            <span>+ Add Header</span>
-                                        </button>
-                                    </div>
-                                    <div id="ShowHeadersList" style="display: flex; flex-direction: column; gap: 0.75em;">
-                                        <!-- Dynamic headers will be added here -->
-                                    </div>
-                                    <div class="fieldDescription" style="margin-top: 0.5em;">
-                                        Header values support placeholders. Common headers: Authorization, Content-Type, X-Api-Key
-                                    </div>
-                                </div>
-
-                                <!-- Payload Template -->
-                                <div style="margin-top: 1.5em;">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75em;">
-                                        <label style="font-weight: 500; font-size: 0.95em;">Request Payload:</label>
-                                        <button is="emby-button" type="button" id="ResetShowPayloadBtn" class="raised" style="padding: 0.4em 1em; font-size: 0.85em;">
-                                            <span>Reset to Default</span>
-                                        </button>
-                                    </div>
-                                    <textarea is="emby-input" id="WebhookShowPayload" name="WebhookShowPayload" rows="10" style="font-family: 'Courier New', monospace; font-size: 0.9em; background-color: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 1em; color: white"></textarea>
-                                    <div class="fieldDescription" style="margin-top: 0.5em;">
-                                        JSON template for the request body. Click placeholder names below to insert them:
-                                    </div>
-                                    <div style="margin-top: 0.5em; display: flex; flex-wrap: wrap; gap: 0.5em;">
-                                        <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{tvdbId}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{tvdbId}</button>
-                                        <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{tmdbId}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{tmdbId}</button>
-                                        <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{imdbId}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{imdbId}</button>
-                                        <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{title}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{title}</button>
-                                        <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{year}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{year}</button>
-                                        <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{seasonNumber}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{seasonNumber}</button>
-                                        <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{isAnime}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{isAnime}</button>
-                                        <button type="button" class="placeholder-btn show-placeholder" data-placeholder="{jellyfinUserId}" style="padding: 0.3em 0.6em; font-size: 0.8em; background-color: rgba(0, 164, 220, 0.2); border: 1px solid rgba(0, 164, 220, 0.5); border-radius: 4px; cursor: pointer; font-family: monospace; color: white">{jellyfinUserId}</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <!-- Native Integration Section -->
-                        <div id="NativeIntegrationSection">
-                        <!-- Radarr Settings -->
-                            <div class="verticalSection">
-                                <h3 class="sectionTitle">Radarr Settings</h3>
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="RadarrUrl">Radarr URL:</label>
-                                    <input is="emby-input" type="text" id="RadarrUrl" name="RadarrUrl" placeholder="http://localhost:7878" />
-                                </div>
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="RadarrApiKey">Radarr API Key:</label>
-                                    <input is="emby-input" type="text" id="RadarrApiKey" name="RadarrApiKey" />
-                                </div>
-                                <div style="margin-top: 1em;">
-                                    <button is="emby-button" type="button" id="TestRadarrBtn" class="raised button-submit">
-                                        <span>Test Connection</span>
-                                    </button>
-                                </div>
-                                <div id="RadarrConnectionStatus" style="margin-top: 1em; display: none;"></div>
-                                <div id="RadarrOptionsSection" style="display: none;">
-                                    <div class="inputContainer" style="margin-top: 1em;">
-                                        <label class="inputLabel inputLabelUnfocused" for="RadarrQualityProfile">Quality Profile:</label>
-                                        <select is="emby-select" id="RadarrQualityProfile" name="RadarrQualityProfile">
-                                            <option value="">Select a quality profile...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            Quality profile to use when downloading movies
-                                        </div>
-                                    </div>
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="RadarrRootFolder">Root Folder:</label>
-                                        <select is="emby-select" id="RadarrRootFolder" name="RadarrRootFolder">
-                                            <option value="">Select a root folder...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            Folder where downloaded movies will be stored
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-        
-                            <!-- Sonarr Settings -->
-                            <div class="verticalSection">
-                                <h3 class="sectionTitle">Sonarr Settings</h3>
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="SonarrUrl">Sonarr URL:</label>
-                                    <input is="emby-input" type="text" id="SonarrUrl" name="SonarrUrl" placeholder="http://localhost:8989" />
-                                </div>
-                                <div class="inputContainer">
-                                    <label class="inputLabel inputLabelUnfocused" for="SonarrApiKey">Sonarr API Key:</label>
-                                    <input is="emby-input" type="text" id="SonarrApiKey" name="SonarrApiKey" />
-                                </div>
-                                <div style="margin-top: 1em;">
-                                    <button is="emby-button" type="button" id="TestSonarrBtn" class="raised button-submit">
-                                        <span>Test Connection</span>
-                                    </button>
-                                </div>
-                                <div id="SonarrConnectionStatus" style="margin-top: 1em; display: none;"></div>
-                                <div id="SonarrOptionsSection" style="display: none;">
-                                    <div class="inputContainer" style="margin-top: 1em;">
-                                        <label class="inputLabel inputLabelUnfocused" for="SonarrQualityProfile">Quality Profile:</label>
-                                        <select is="emby-select" id="SonarrQualityProfile" name="SonarrQualityProfile">
-                                            <option value="">Select a quality profile...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            Quality profile to use when downloading TV shows
-                                        </div>
-                                    </div>
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="SonarrRootFolder">Root Folder:</label>
-                                        <select is="emby-select" id="SonarrRootFolder" name="SonarrRootFolder">
-                                            <option value="">Select a root folder...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            Folder where downloaded TV shows will be stored
-                                        </div>
-                                    </div>
-                                    <div class="inputContainer">
-                                        <label class="inputLabel inputLabelUnfocused" for="SonarrAnimeRootFolder">Anime Root Folder (Optional):</label>
-                                        <select is="emby-select" id="SonarrAnimeRootFolder" name="SonarrAnimeRootFolder">
-                                            <option value="">Same as regular shows...</option>
-                                        </select>
-                                        <div class="fieldDescription">
-                                            Optional separate folder for anime shows. If not specified, uses the regular root folder.
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- End Native Integration Section -->
-                    </div>
+                    <!-- Tab Content Containers (will be loaded dynamically) -->
+                    <div class="tabContent" data-index="0"></div>
+                    <div class="tabContent" data-index="1" style="display: none;"></div>
+                    <div class="tabContent" data-index="2" style="display: none;"></div>
+                    <div class="tabContent" data-index="3" style="display: none;"></div>
 
                     <!-- Save Button (outside all tabs) -->
                     <div style="margin-top: 2em;">
@@ -625,7 +53,9 @@
             </div>
         </div>
 
+        <!-- Shared utilities and main page logic -->
         <script type="text/javascript">
+            // Shared utilities and global configuration
             var JellyNextConfig = {
                 pluginUniqueId: 'a4df60c5-6ab4-412a-8f79-2cab93fb2bc5',
                 currentUserGuid: null,
@@ -645,256 +75,6 @@
                 savedJellyseerrSonarrProfileId: null,
                 savedJellyseerrSonarrAnimeProfileId: null
             };
-
-            // Toggle download integration sections
-            function toggleDownloadIntegration(integrationType) {
-                var nativeSection = document.getElementById('NativeIntegrationSection');
-                var jellyseerrSection = document.getElementById('JellyseerrSection');
-                var webhookSection = document.getElementById('WebhookSection');
-                var nativeOption = document.getElementById('NativeIntegrationOption');
-                var jellyseerrOption = document.getElementById('JellyseerrIntegrationOption');
-                var webhookOption = document.getElementById('WebhookIntegrationOption');
-
-                // Reset all styles
-                nativeOption.style.borderColor = '#444';
-                nativeOption.style.backgroundColor = 'transparent';
-                jellyseerrOption.style.borderColor = '#444';
-                jellyseerrOption.style.backgroundColor = 'transparent';
-                webhookOption.style.borderColor = '#444';
-                webhookOption.style.backgroundColor = 'transparent';
-
-                if (integrationType === 0 || integrationType === '0') {
-                    // Native integration
-                    nativeSection.style.display = 'block';
-                    jellyseerrSection.style.display = 'none';
-                    webhookSection.style.display = 'none';
-                    nativeOption.style.borderColor = '#00a4dc';
-                    nativeOption.style.backgroundColor = 'rgba(0, 164, 220, 0.1)';
-                } else if (integrationType === 1 || integrationType === '1') {
-                    // Jellyseerr integration
-                    nativeSection.style.display = 'none';
-                    jellyseerrSection.style.display = 'block';
-                    webhookSection.style.display = 'none';
-                    jellyseerrOption.style.borderColor = '#00a4dc';
-                    jellyseerrOption.style.backgroundColor = 'rgba(0, 164, 220, 0.1)';
-                } else {
-                    // Webhook integration
-                    nativeSection.style.display = 'none';
-                    jellyseerrSection.style.display = 'none';
-                    webhookSection.style.display = 'block';
-                    webhookOption.style.borderColor = '#00a4dc';
-                    webhookOption.style.backgroundColor = 'rgba(0, 164, 220, 0.1)';
-                }
-            }
-
-            // Toggle Jellyseerr Radarr manual configuration visibility
-            function toggleJellyseerrRadarrManualConfig() {
-                var useDefaults = document.getElementById('UseJellyseerrRadarrDefaults').checked;
-                var manualConfig = document.getElementById('JellyseerrRadarrManualConfig');
-                manualConfig.style.display = useDefaults ? 'none' : 'block';
-            }
-
-            // Toggle Jellyseerr Sonarr manual configuration visibility
-            function toggleJellyseerrSonarrManualConfig() {
-                var useDefaults = document.getElementById('UseJellyseerrSonarrDefaults').checked;
-                var manualConfig = document.getElementById('JellyseerrSonarrManualConfig');
-                manualConfig.style.display = useDefaults ? 'none' : 'block';
-            }
-
-            // Load Jellyseerr servers and profiles
-            function loadJellyseerrServers(jellyseerrUrl, jellyseerrApiKey) {
-                var encodedUrl = encodeURIComponent(jellyseerrUrl);
-                var encodedApiKey = encodeURIComponent(jellyseerrApiKey);
-
-                // Load Radarr servers
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Jellyseerr/Radarr/Servers?jellyseerrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (servers) {
-                    JellyNextConfig.jellyseerrRadarrServers = servers || [];
-                    populateJellyseerrRadarrServers();
-
-                    // Load Sonarr servers
-                    return ApiClient.fetch({
-                        type: 'GET',
-                        url: ApiClient.getUrl('JellyNext/Jellyseerr/Sonarr/Servers?jellyseerrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
-                    });
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (servers) {
-                    JellyNextConfig.jellyseerrSonarrServers = servers || [];
-                    populateJellyseerrSonarrServers();
-
-                    Dashboard.hideLoadingMsg();
-
-                    // Show sections
-                    document.getElementById('JellyseerrRadarrSection').style.display = 'block';
-                    document.getElementById('JellyseerrSonarrSection').style.display = 'block';
-                }).catch(function (error) {
-                    Dashboard.hideLoadingMsg();
-                    console.error('Error loading Jellyseerr servers:', error);
-                    Dashboard.alert('Failed to load server configurations: ' + error.message);
-                });
-            }
-
-            // Populate Radarr server dropdown
-            function populateJellyseerrRadarrServers() {
-                var serverSelect = document.getElementById('JellyseerrRadarrServer');
-                serverSelect.innerHTML = '<option value="">Select a Radarr server...</option>';
-
-                // Determine which server to select - prioritize saved config over API default
-                var serverToSelect = null;
-                if (JellyNextConfig.savedJellyseerrRadarrServerId !== null) {
-                    // User has a saved selection in config - prioritize it
-                    serverToSelect = JellyNextConfig.jellyseerrRadarrServers.find(function (s) {
-                        return s.id == JellyNextConfig.savedJellyseerrRadarrServerId;
-                    });
-                }
-                if (!serverToSelect) {
-                    // No saved selection or saved server not found - use default from API
-                    serverToSelect = JellyNextConfig.jellyseerrRadarrServers.find(function (s) { return s.isDefault; });
-                }
-
-                JellyNextConfig.jellyseerrRadarrServers.forEach(function (server) {
-                    var option = document.createElement('option');
-                    option.value = server.id;
-                    option.text = server.name + (server.isDefault ? ' (Default)' : '');
-                    if (serverToSelect && server.id === serverToSelect.id) {
-                        option.selected = true;
-                    }
-                    serverSelect.appendChild(option);
-                });
-
-                // Load profiles for selected server
-                if (serverToSelect) {
-                    // Prioritize saved profile ID from config over server's active profile
-                    var profileIdToUse = JellyNextConfig.savedJellyseerrRadarrProfileId !== null
-                        ? JellyNextConfig.savedJellyseerrRadarrProfileId
-                        : serverToSelect.activeProfileId;
-                    loadJellyseerrRadarrProfiles(serverToSelect.id, profileIdToUse);
-                }
-            }
-
-            // Populate Sonarr server dropdown
-            function populateJellyseerrSonarrServers() {
-                var serverSelect = document.getElementById('JellyseerrSonarrServer');
-                serverSelect.innerHTML = '<option value="">Select a Sonarr server...</option>';
-
-                // Determine which server to select - prioritize saved config over API default
-                var serverToSelect = null;
-                if (JellyNextConfig.savedJellyseerrSonarrServerId !== null) {
-                    // User has a saved selection in config - prioritize it
-                    serverToSelect = JellyNextConfig.jellyseerrSonarrServers.find(function (s) {
-                        return s.id == JellyNextConfig.savedJellyseerrSonarrServerId;
-                    });
-                }
-                if (!serverToSelect) {
-                    // No saved selection or saved server not found - use default from API
-                    serverToSelect = JellyNextConfig.jellyseerrSonarrServers.find(function (s) { return s.isDefault; });
-                }
-
-                JellyNextConfig.jellyseerrSonarrServers.forEach(function (server) {
-                    var option = document.createElement('option');
-                    option.value = server.id;
-                    option.text = server.name + (server.isDefault ? ' (Default)' : '');
-                    if (serverToSelect && server.id === serverToSelect.id) {
-                        option.selected = true;
-                    }
-                    serverSelect.appendChild(option);
-                });
-
-                // Load profiles for selected server
-                if (serverToSelect) {
-                    // Prioritize saved profile IDs from config over server's active profiles
-                    var profileIdToUse = JellyNextConfig.savedJellyseerrSonarrProfileId !== null
-                        ? JellyNextConfig.savedJellyseerrSonarrProfileId
-                        : serverToSelect.activeProfileId;
-                    var animeProfileIdToUse = JellyNextConfig.savedJellyseerrSonarrAnimeProfileId !== null
-                        ? JellyNextConfig.savedJellyseerrSonarrAnimeProfileId
-                        : serverToSelect.activeAnimeProfileId;
-                    loadJellyseerrSonarrProfiles(serverToSelect.id, profileIdToUse, animeProfileIdToUse);
-                }
-            }
-
-            // Load Radarr profiles for a server
-            function loadJellyseerrRadarrProfiles(serverId, defaultProfileId) {
-                var jellyseerrUrl = document.getElementById('JellyseerrUrl').value;
-                var jellyseerrApiKey = document.getElementById('JellyseerrApiKey').value;
-                var encodedUrl = encodeURIComponent(jellyseerrUrl);
-                var encodedApiKey = encodeURIComponent(jellyseerrApiKey);
-
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Jellyseerr/Radarr/' + serverId + '/Profiles?jellyseerrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (profiles) {
-                    JellyNextConfig.jellyseerrRadarrProfiles = profiles || [];
-                    var profileSelect = document.getElementById('JellyseerrRadarrProfile');
-                    profileSelect.innerHTML = '<option value="">Select a quality profile...</option>';
-
-                    profiles.forEach(function (profile) {
-                        var option = document.createElement('option');
-                        option.value = profile.id;
-                        option.text = profile.name;
-                        if (profile.id === defaultProfileId) {
-                            option.selected = true;
-                        }
-                        profileSelect.appendChild(option);
-                    });
-                }).catch(function (error) {
-                    console.error('Error loading Radarr profiles:', error);
-                });
-            }
-
-            // Load Sonarr profiles for a server
-            function loadJellyseerrSonarrProfiles(serverId, defaultProfileId, defaultAnimeProfileId) {
-                var jellyseerrUrl = document.getElementById('JellyseerrUrl').value;
-                var jellyseerrApiKey = document.getElementById('JellyseerrApiKey').value;
-                var encodedUrl = encodeURIComponent(jellyseerrUrl);
-                var encodedApiKey = encodeURIComponent(jellyseerrApiKey);
-
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Jellyseerr/Sonarr/' + serverId + '/Profiles?jellyseerrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (profiles) {
-                    JellyNextConfig.jellyseerrSonarrProfiles = profiles || [];
-
-                    // Populate regular profile dropdown
-                    var profileSelect = document.getElementById('JellyseerrSonarrProfile');
-                    profileSelect.innerHTML = '<option value="">Select a quality profile...</option>';
-
-                    profiles.forEach(function (profile) {
-                        var option = document.createElement('option');
-                        option.value = profile.id;
-                        option.text = profile.name;
-                        if (profile.id === defaultProfileId) {
-                            option.selected = true;
-                        }
-                        profileSelect.appendChild(option);
-                    });
-
-                    // Populate anime profile dropdown
-                    var animeProfileSelect = document.getElementById('JellyseerrSonarrAnimeProfile');
-                    animeProfileSelect.innerHTML = '<option value="">Use same profile as regular TV shows</option>';
-
-                    profiles.forEach(function (profile) {
-                        var option = document.createElement('option');
-                        option.value = profile.id;
-                        option.text = profile.name;
-                        if (defaultAnimeProfileId && profile.id === defaultAnimeProfileId) {
-                            option.selected = true;
-                        }
-                        animeProfileSelect.appendChild(option);
-                    });
-                }).catch(function (error) {
-                    console.error('Error loading Sonarr profiles:', error);
-                });
-            }
 
             // Tab switching functionality
             function switchTab(index) {
@@ -939,766 +119,156 @@
                 switchTab(0);
             }
 
-            // Load users into dropdown
-            function loadUsers() {
-                ApiClient.getUsers().then(function (users) {
-                    var userSelector = document.getElementById('UserSelector');
-                    userSelector.innerHTML = '<option value="">Select a user...</option>';
-
-                    users.forEach(function (user) {
-                        var option = document.createElement('option');
-                        option.value = user.Id;
-                        option.textContent = user.Name;
-                        userSelector.appendChild(option);
-                    });
-                });
-            }
-
-            // Update trending movies options visibility based on enabled checkbox
-            function updateTrendingOptionsVisibility() {
-                var enabled = document.getElementById('TrendingMoviesEnabled').checked;
-                document.getElementById('TrendingMoviesOptions').style.display = enabled ? 'block' : 'none';
-            }
-
-            // Check authorization status for selected user
-            function checkAuthorizationStatus(userGuid) {
-                if (!userGuid) {
-                    document.getElementById('AuthorizationStatus').style.display = 'none';
-                    return;
-                }
-
-                JellyNextConfig.currentUserGuid = userGuid;
-                document.getElementById('AuthorizationStatus').style.display = 'block';
-
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + userGuid + '/AuthorizationStatus')
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (status) {
-                    if (status.isAuthorized) {
-                        showAuthorizedState();
-                    } else {
-                        showNotAuthorizedState();
-                    }
-                }).catch(function (error) {
-                    console.error('Error checking authorization status:', error);
-                    showNotAuthorizedState();
-                });
-            }
-
-            // Show not authorized state
-            function showNotAuthorizedState() {
-                document.getElementById('NotAuthorizedSection').style.display = 'block';
-                document.getElementById('AuthorizedSection').style.display = 'none';
-                document.getElementById('AuthorizingSection').style.display = 'none';
-            }
-
-            // Show authorized state
-            function showAuthorizedState() {
-                document.getElementById('NotAuthorizedSection').style.display = 'none';
-                document.getElementById('AuthorizedSection').style.display = 'block';
-                document.getElementById('AuthorizingSection').style.display = 'none';
-                loadUserSettings();
-            }
-
-            // Load user-specific settings
-            function loadUserSettings() {
-                if (!JellyNextConfig.currentUserGuid) {
-                    return;
-                }
-
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/Settings')
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (settings) {
-                    document.getElementById('UserSyncMovieRecommendations').checked = settings.syncMovieRecommendations !== false;
-                    document.getElementById('UserSyncShowRecommendations').checked = settings.syncShowRecommendations !== false;
-                    document.getElementById('UserSyncNextSeasons').checked = settings.syncNextSeasons !== false;
-                    document.getElementById('UserIgnoreCollected').checked = settings.ignoreCollected !== false;
-                    document.getElementById('UserIgnoreWatchlisted').checked = settings.ignoreWatchlisted === true;
-                    document.getElementById('UserLimitShowsToSeasonOne').checked = settings.limitShowsToSeasonOne !== false;
-                    document.getElementById('UserMovieRecommendationsLimit').value = settings.movieRecommendationsLimit || 50;
-                    document.getElementById('UserShowRecommendationsLimit').value = settings.showRecommendationsLimit || 50;
-                }).catch(function (error) {
-                    console.error('Error loading user settings:', error);
-                });
-            }
-
-            // Show authorizing state
-            function showAuthorizingState(userCode) {
-                document.getElementById('NotAuthorizedSection').style.display = 'none';
-                document.getElementById('AuthorizedSection').style.display = 'none';
-                document.getElementById('AuthorizingSection').style.display = 'block';
-                document.getElementById('UserCodeDisplay').textContent = userCode;
-            }
-
-            // Start OAuth authorization
-            document.getElementById('AuthorizeBtn').addEventListener('click', function () {
-                if (!JellyNextConfig.currentUserGuid) {
-                    Dashboard.alert('Please select a user first');
-                    return;
-                }
-
-                Dashboard.showLoadingMsg();
-
-                ApiClient.fetch({
-                    type: 'POST',
-                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/Authorize')
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (result) {
-                    Dashboard.hideLoadingMsg();
-                    showAuthorizingState(result.userCode);
-
-                    // Poll for authorization completion
-                    JellyNextConfig.authCheckInterval = setInterval(function () {
-                        checkAuthorizationCompletion();
-                    }, 3000); // Check every 3 seconds
-                }).catch(function (error) {
-                    Dashboard.hideLoadingMsg();
-                    console.error('Error starting authorization:', error);
-                    Dashboard.alert('Failed to start authorization. Please try again.');
-                });
-            });
-
-            // Check if authorization is complete
-            function checkAuthorizationCompletion() {
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/AuthorizationStatus')
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (status) {
-                    if (status.isAuthorized) {
-                        clearInterval(JellyNextConfig.authCheckInterval);
-                        Dashboard.alert('Successfully linked Trakt account!');
-                        showAuthorizedState();
-                    }
-                }).catch(function (error) {
-                    console.error('Error checking authorization completion:', error);
-                });
-            }
-
-            // Deauthorize user
-            document.getElementById('DeauthorizeBtn').addEventListener('click', function () {
-                if (!JellyNextConfig.currentUserGuid) {
-                    return;
-                }
-
-                if (!confirm('Are you sure you want to unlink this Trakt account?')) {
-                    return;
-                }
-
-                Dashboard.showLoadingMsg();
-
-                ApiClient.fetch({
-                    type: 'POST',
-                    url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/Deauthorize')
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (result) {
-                    Dashboard.hideLoadingMsg();
-                    Dashboard.alert('Successfully unlinked Trakt account');
-                    showNotAuthorizedState();
-                }).catch(function (error) {
-                    Dashboard.hideLoadingMsg();
-                    console.error('Error deauthorizing:', error);
-                    Dashboard.alert('Failed to unlink Trakt account');
-                });
-            });
-
-            // User selection change
-            document.getElementById('UserSelector').addEventListener('change', function (e) {
-                var userGuid = e.target.value;
-                if (JellyNextConfig.authCheckInterval) {
-                    clearInterval(JellyNextConfig.authCheckInterval);
-                }
-                checkAuthorizationStatus(userGuid);
-            });
-
-            // Trending movies enabled checkbox
-            document.getElementById('TrendingMoviesEnabled').addEventListener('change', function () {
-                updateTrendingOptionsVisibility();
-            });
-
-            // Default payload templates
-            var defaultMoviePayload = `{
-  "tmdbId": "{tmdbId}",
-  "imdbId": "{imdbId}",
-  "title": "{title}",
-  "year": "{year}",
-  "jellyfinUserId": "{jellyfinUserId}"
-}`;
-
-            var defaultShowPayload = `{
-  "tvdbId": "{tvdbId}",
-  "tmdbId": "{tmdbId}",
-  "imdbId": "{imdbId}",
-  "title": "{title}",
-  "year": "{year}",
-  "seasonNumber": {seasonNumber},
-  "isAnime": {isAnime},
-  "jellyfinUserId": "{jellyfinUserId}"
-}`;
-
-            // Dynamic header management
-            var movieHeadersData = [];
-            var showHeadersData = [];
-
-            function createHeaderRow(name, value, type, index) {
-                var row = document.createElement('div');
-                row.style.cssText = 'display: grid; grid-template-columns: 1fr 2fr auto; gap: 0.5em; align-items: center; padding: 0.5em; background-color: rgba(255, 255, 255, 0.03); border-radius: 4px;';
-
-                // Create name input
-                var nameInput = document.createElement('input');
-                nameInput.type = 'text';
-                nameInput.placeholder = 'Header Name';
-                nameInput.value = name || '';
-                nameInput.setAttribute('data-index', index);
-                nameInput.setAttribute('data-type', type);
-                nameInput.setAttribute('data-field', 'name');
-                nameInput.style.cssText = 'padding: 0.5em; font-size: 0.9em;';
-
-                // Create value input
-                var valueInput = document.createElement('input');
-                valueInput.type = 'text';
-                valueInput.placeholder = 'Header Value';
-                valueInput.value = value || '';
-                valueInput.setAttribute('data-index', index);
-                valueInput.setAttribute('data-type', type);
-                valueInput.setAttribute('data-field', 'value');
-                valueInput.style.cssText = 'padding: 0.5em; font-size: 0.9em;';
-
-                // Create remove button
-                var removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.className = 'remove-header-btn';
-                removeBtn.setAttribute('data-index', index);
-                removeBtn.setAttribute('data-type', type);
-                removeBtn.textContent = '×';
-                removeBtn.style.cssText = 'padding: 0.5em 0.75em; background-color: rgba(204, 51, 51, 0.2); border: 1px solid rgba(204, 51, 51, 0.5); border-radius: 4px; cursor: pointer; color: #cc3333; font-size: 0.9em;';
-
-                row.appendChild(nameInput);
-                row.appendChild(valueInput);
-                row.appendChild(removeBtn);
-
-                return row;
-            }
-
-            function renderMovieHeaders() {
-                var container = document.getElementById('MovieHeadersList');
-                container.innerHTML = '';
-                if (movieHeadersData.length === 0) {
-                    container.innerHTML = '<div style="padding: 1em; text-align: center; opacity: 0.5; font-size: 0.9em;">No custom headers. Click "+ Add Header" to add one.</div>';
-                } else {
-                    movieHeadersData.forEach(function(header, index) {
-                        container.appendChild(createHeaderRow(header.name, header.value, 'movie', index));
-                    });
-                }
-            }
-
-            function renderShowHeaders() {
-                var container = document.getElementById('ShowHeadersList');
-                container.innerHTML = '';
-                if (showHeadersData.length === 0) {
-                    container.innerHTML = '<div style="padding: 1em; text-align: center; opacity: 0.5; font-size: 0.9em;">No custom headers. Click "+ Add Header" to add one.</div>';
-                } else {
-                    showHeadersData.forEach(function(header, index) {
-                        container.appendChild(createHeaderRow(header.name, header.value, 'show', index));
-                    });
-                }
-            }
-
-            // Add header buttons
-            document.getElementById('AddMovieHeaderBtn').addEventListener('click', function() {
-                movieHeadersData.push({ name: '', value: '' });
-                renderMovieHeaders();
-            });
-
-            document.getElementById('AddShowHeaderBtn').addEventListener('click', function() {
-                showHeadersData.push({ name: '', value: '' });
-                renderShowHeaders();
-            });
-
-            // Event delegation for header input changes and removal
-            document.addEventListener('input', function(e) {
-                var target = e.target;
-                if (target.hasAttribute('data-type') && target.hasAttribute('data-field')) {
-                    var index = parseInt(target.getAttribute('data-index'));
-                    var type = target.getAttribute('data-type');
-                    var field = target.getAttribute('data-field');
-                    var dataArray = type === 'movie' ? movieHeadersData : showHeadersData;
-                    if (dataArray[index]) {
-                        dataArray[index][field] = target.value;
-                    }
-                }
-            });
-
-            document.addEventListener('click', function(e) {
-                if (e.target.classList.contains('remove-header-btn')) {
-                    var index = parseInt(e.target.getAttribute('data-index'));
-                    var type = e.target.getAttribute('data-type');
-                    if (type === 'movie') {
-                        movieHeadersData.splice(index, 1);
-                        renderMovieHeaders();
-                    } else {
-                        showHeadersData.splice(index, 1);
-                        renderShowHeaders();
-                    }
-                }
-            });
-
-            // Placeholder button clicks
-            document.addEventListener('click', function(e) {
-                if (e.target.classList.contains('placeholder-btn')) {
-                    var placeholder = e.target.getAttribute('data-placeholder');
-                    var isMovie = e.target.classList.contains('movie-placeholder');
-                    var textarea = document.getElementById(isMovie ? 'WebhookMoviePayload' : 'WebhookShowPayload');
-
-                    // Insert at cursor position
-                    var startPos = textarea.selectionStart;
-                    var endPos = textarea.selectionEnd;
-                    var textBefore = textarea.value.substring(0, startPos);
-                    var textAfter = textarea.value.substring(endPos);
-
-                    textarea.value = textBefore + placeholder + textAfter;
-                    textarea.selectionStart = textarea.selectionEnd = startPos + placeholder.length;
-                    textarea.focus();
-                }
-            });
-
-            // Reset movie payload button
-            document.getElementById('ResetMoviePayloadBtn').addEventListener('click', function () {
-                document.getElementById('WebhookMoviePayload').value = defaultMoviePayload;
-            });
-
-            // Reset show payload button
-            document.getElementById('ResetShowPayloadBtn').addEventListener('click', function () {
-                document.getElementById('WebhookShowPayload').value = defaultShowPayload;
-            });
-
-            // Download integration radio buttons
-            document.getElementById('DownloadIntegrationNative').addEventListener('change', function () {
-                if (this.checked) {
-                    toggleDownloadIntegration(0);
-                }
-            });
-
-            document.getElementById('DownloadIntegrationJellyseerr').addEventListener('change', function () {
-                if (this.checked) {
-                    toggleDownloadIntegration(1);
-                }
-            });
-
-            document.getElementById('DownloadIntegrationWebhook').addEventListener('change', function () {
-                if (this.checked) {
-                    toggleDownloadIntegration(2);
-                }
-            });
-
-            // Jellyseerr default config checkboxes
-            document.getElementById('UseJellyseerrRadarrDefaults').addEventListener('change', function () {
-                toggleJellyseerrRadarrManualConfig();
-            });
-
-            document.getElementById('UseJellyseerrSonarrDefaults').addEventListener('change', function () {
-                toggleJellyseerrSonarrManualConfig();
-            });
-
-            // Test Jellyseerr connection
-            document.getElementById('TestJellyseerrBtn').addEventListener('click', function () {
-                var jellyseerrUrl = document.getElementById('JellyseerrUrl').value;
-                var jellyseerrApiKey = document.getElementById('JellyseerrApiKey').value;
-
-                if (!jellyseerrUrl || !jellyseerrApiKey) {
-                    Dashboard.alert('Please enter Jellyseerr URL and API Key first');
-                    return;
-                }
-
-                Dashboard.showLoadingMsg();
-                var statusDiv = document.getElementById('JellyseerrConnectionStatus');
-                statusDiv.style.display = 'none';
-
-                var encodedUrl = encodeURIComponent(jellyseerrUrl);
-                var encodedApiKey = encodeURIComponent(jellyseerrApiKey);
-
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Jellyseerr/TestConnection?jellyseerrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (result) {
-                    statusDiv.style.display = 'block';
-
-                    if (result.success || result.Success) {
-                        var version = result.version || result.Version || 'Unknown';
-                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #52B54B;">✓ Successfully connected to Jellyseerr v' + version + '</div>';
-
-                        // Load servers and profiles
-                        loadJellyseerrServers(jellyseerrUrl, jellyseerrApiKey);
-                    } else {
-                        Dashboard.hideLoadingMsg();
-                        var errorMsg = result.errorMessage || result.ErrorMessage || 'Unknown error';
-                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + errorMsg + '</div>';
-                    }
-                }).catch(function (error) {
-                    Dashboard.hideLoadingMsg();
-                    statusDiv.style.display = 'block';
-                    statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + error.message + '</div>';
-                });
-            });
-
-            // Jellyseerr Radarr server selection change
-            document.getElementById('JellyseerrRadarrServer').addEventListener('change', function () {
-                var serverId = parseInt(this.value);
-                if (!serverId) return;
-
-                var server = JellyNextConfig.jellyseerrRadarrServers.find(function (s) { return s.id === serverId; });
-                if (server) {
-                    loadJellyseerrRadarrProfiles(serverId, server.activeProfileId);
-                }
-            });
-
-            // Jellyseerr Sonarr server selection change
-            document.getElementById('JellyseerrSonarrServer').addEventListener('change', function () {
-                var serverId = parseInt(this.value);
-                if (!serverId) return;
-
-                var server = JellyNextConfig.jellyseerrSonarrServers.find(function (s) { return s.id === serverId; });
-                if (server) {
-                    loadJellyseerrSonarrProfiles(serverId, server.activeProfileId, server.activeAnimeProfileId);
-                }
-            });
-
-            // Test Radarr connection
-            document.getElementById('TestRadarrBtn').addEventListener('click', function () {
-                var radarrUrl = document.getElementById('RadarrUrl').value;
-                var radarrApiKey = document.getElementById('RadarrApiKey').value;
-
-                if (!radarrUrl || !radarrApiKey) {
-                    Dashboard.alert('Please enter Radarr URL and API Key first');
-                    return;
-                }
-
-                Dashboard.showLoadingMsg();
-                var statusDiv = document.getElementById('RadarrConnectionStatus');
-                var optionsSection = document.getElementById('RadarrOptionsSection');
-                statusDiv.style.display = 'none';
-                optionsSection.style.display = 'none';
-
-                var encodedUrl = encodeURIComponent(radarrUrl);
-                var encodedApiKey = encodeURIComponent(radarrApiKey);
-
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Radarr/TestConnection?radarrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (result) {
-                    Dashboard.hideLoadingMsg();
-                    statusDiv.style.display = 'block';
-
-                    if (result.Success) {
-                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #52B54B;">✓ Successfully connected to Radarr v' + result.Version + '</div>';
-
-                        JellyNextConfig.radarrProfiles = result.QualityProfiles || [];
-                        JellyNextConfig.radarrFolders = result.RootFolders || [];
-
-                        populateRadarrOptions();
-                        optionsSection.style.display = 'block';
-                    } else {
-                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + (result.ErrorMessage || 'Unknown error') + '</div>';
-                        optionsSection.style.display = 'none';
-                    }
-                }).catch(function (error) {
-                    Dashboard.hideLoadingMsg();
-                    statusDiv.style.display = 'block';
-                    statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + error.message + '</div>';
-                    optionsSection.style.display = 'none';
-                });
-            });
-
-            // Populate Radarr quality profiles and root folders
-            function populateRadarrOptions() {
-                var profileSelect = document.getElementById('RadarrQualityProfile');
-                var folderSelect = document.getElementById('RadarrRootFolder');
-
-                profileSelect.innerHTML = '<option value="">Select a quality profile...</option>';
-                JellyNextConfig.radarrProfiles.forEach(function (profile) {
-                    var option = document.createElement('option');
-                    option.value = profile.id;
-                    option.textContent = profile.name;
-                    profileSelect.appendChild(option);
-                });
-
-                folderSelect.innerHTML = '<option value="">Select a root folder...</option>';
-                JellyNextConfig.radarrFolders.forEach(function (folder) {
-                    var option = document.createElement('option');
-                    option.value = folder.path;
-                    option.textContent = folder.path + ' (' + formatBytes(folder.freeSpace) + ' free)';
-                    folderSelect.appendChild(option);
-                });
-
-                // Try to restore previously selected values
-                ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
-                    if (config.RadarrQualityProfileId) {
-                        profileSelect.value = config.RadarrQualityProfileId;
-                    }
-                    if (config.RadarrRootFolderPath) {
-                        folderSelect.value = config.RadarrRootFolderPath;
-                    }
-                });
-            }
-
-            // Format bytes to human-readable size
+            // Utility function to format bytes
             function formatBytes(bytes) {
-                if (bytes === 0) return '0 B';
+                if (bytes === 0) return '0 Bytes';
                 var k = 1024;
-                var sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                var sizes = ['Bytes', 'KB', 'MB', 'GB'];
                 var i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
             }
 
-            // Test Sonarr connection
-            document.getElementById('TestSonarrBtn').addEventListener('click', function () {
-                var sonarrUrl = document.getElementById('SonarrUrl').value;
-                var sonarrApiKey = document.getElementById('SonarrApiKey').value;
-
-                if (!sonarrUrl || !sonarrApiKey) {
-                    Dashboard.alert('Please enter Sonarr URL and API Key first');
-                    return;
-                }
-
-                Dashboard.showLoadingMsg();
-                var statusDiv = document.getElementById('SonarrConnectionStatus');
-                var optionsSection = document.getElementById('SonarrOptionsSection');
-                statusDiv.style.display = 'none';
-                optionsSection.style.display = 'none';
-
-                var encodedUrl = encodeURIComponent(sonarrUrl);
-                var encodedApiKey = encodeURIComponent(sonarrApiKey);
-
-                ApiClient.fetch({
-                    type: 'GET',
-                    url: ApiClient.getUrl('JellyNext/Sonarr/TestConnection?sonarrUrl=' + encodedUrl + '&apiKey=' + encodedApiKey)
-                }).then(function (response) {
-                    return response.json();
-                }).then(function (result) {
-                    Dashboard.hideLoadingMsg();
-                    statusDiv.style.display = 'block';
-
-                    if (result.Success) {
-                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #52B54B;">✓ Successfully connected to Sonarr v' + result.Version + '</div>';
-
-                        JellyNextConfig.sonarrProfiles = result.QualityProfiles || [];
-                        JellyNextConfig.sonarrFolders = result.RootFolders || [];
-
-                        populateSonarrOptions();
-                        optionsSection.style.display = 'block';
-                    } else {
-                        statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + (result.ErrorMessage || 'Unknown error') + '</div>';
-                        optionsSection.style.display = 'none';
-                    }
-                }).catch(function (error) {
-                    Dashboard.hideLoadingMsg();
-                    statusDiv.style.display = 'block';
-                    statusDiv.innerHTML = '<div class="fieldDescription" style="color: #cc3333;">✗ Connection failed: ' + error.message + '</div>';
-                    optionsSection.style.display = 'none';
-                });
-            });
-
-            // Populate Sonarr quality profiles and root folders
-            function populateSonarrOptions() {
-                var profileSelect = document.getElementById('SonarrQualityProfile');
-                var folderSelect = document.getElementById('SonarrRootFolder');
-                var animeFolderSelect = document.getElementById('SonarrAnimeRootFolder');
-
-                profileSelect.innerHTML = '<option value="">Select a quality profile...</option>';
-                JellyNextConfig.sonarrProfiles.forEach(function (profile) {
-                    var option = document.createElement('option');
-                    option.value = profile.id;
-                    option.textContent = profile.name;
-                    profileSelect.appendChild(option);
-                });
-
-                folderSelect.innerHTML = '<option value="">Select a root folder...</option>';
-                JellyNextConfig.sonarrFolders.forEach(function (folder) {
-                    var option = document.createElement('option');
-                    option.value = folder.path;
-                    option.textContent = folder.path + ' (' + formatBytes(folder.freeSpace) + ' free)';
-                    folderSelect.appendChild(option);
-                });
-
-                animeFolderSelect.innerHTML = '<option value="">Same as regular shows...</option>';
-                JellyNextConfig.sonarrFolders.forEach(function (folder) {
-                    var option = document.createElement('option');
-                    option.value = folder.path;
-                    option.textContent = folder.path + ' (' + formatBytes(folder.freeSpace) + ' free)';
-                    animeFolderSelect.appendChild(option);
-                });
-
-                // Try to restore previously selected values
-                ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
-                    if (config.SonarrQualityProfileId) {
-                        profileSelect.value = config.SonarrQualityProfileId;
-                    }
-                    if (config.SonarrRootFolderPath) {
-                        folderSelect.value = config.SonarrRootFolderPath;
-                    }
-                    if (config.SonarrAnimeRootFolderPath) {
-                        animeFolderSelect.value = config.SonarrAnimeRootFolderPath;
-                    }
-                });
-            }
-
-            // Load configuration on page show
-            document.getElementById('JellyNextConfigPage').addEventListener('pageshow', function () {
-                Dashboard.showLoadingMsg();
-
-                // Initialize tabs
-                initializeTabs();
-
-                // Load users
-                loadUsers();
-
-                // Load plugin configuration
-                ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
-                    // Download integration settings
-                    var downloadIntegration = config.DownloadIntegration !== undefined ? config.DownloadIntegration : 0;
-                    if (downloadIntegration === 0 || downloadIntegration === "Native") {
-                        downloadIntegration = 0;
-                    } else if (downloadIntegration === "Jellyseerr") {
-                        downloadIntegration = 1;
-                    } else if (downloadIntegration === "Webhook") {
-                        downloadIntegration = 2;
-                    }
-                    if (downloadIntegration === 0 || downloadIntegration === '0') {
-                        document.getElementById('DownloadIntegrationNative').checked = true;
-                    } else if (downloadIntegration === 1 || downloadIntegration === '1') {
-                        document.getElementById('DownloadIntegrationJellyseerr').checked = true;
-                    } else {
-                        document.getElementById('DownloadIntegrationWebhook').checked = true;
-                    }
-                    toggleDownloadIntegration(downloadIntegration);
-
-                    // Webhook settings
-                    document.getElementById('WebhookMethod').value = config.WebhookMethod || 'POST';
-                    document.getElementById('WebhookMovieUrl').value = config.WebhookMovieUrl || '';
-                    document.getElementById('WebhookShowUrl').value = config.WebhookShowUrl || '';
-
-                    // Load webhook headers into dynamic arrays
-                    movieHeadersData = (config.WebhookMovieHeaders || []).map(h => ({
-                        name: h.Name || '',
-                        value: h.Value || ''
-                    }));
-                    showHeadersData = (config.WebhookShowHeaders || []).map(h => ({
-                        name: h.Name || '',
-                        value: h.Value || ''
-                    }));
-
-                    // Render headers
-                    renderMovieHeaders();
-                    renderShowHeaders();
-
-                    // Load webhook payloads (use defaults if not set)
-                    document.getElementById('WebhookMoviePayload').value = config.WebhookMoviePayload || defaultMoviePayload;
-                    document.getElementById('WebhookShowPayload').value = config.WebhookShowPayload || defaultShowPayload;
-
-                    document.getElementById('JellyseerrUrl').value = config.JellyseerrUrl || '';
-                    document.getElementById('JellyseerrApiKey').value = config.JellyseerrApiKey || '';
-
-                    // Load Jellyseerr default config checkboxes
-                    document.getElementById('UseJellyseerrRadarrDefaults').checked = config.UseJellyseerrRadarrDefaults !== false;
-                    document.getElementById('UseJellyseerrSonarrDefaults').checked = config.UseJellyseerrSonarrDefaults !== false;
-                    toggleJellyseerrRadarrManualConfig();
-                    toggleJellyseerrSonarrManualConfig();
-
-                    // Store Jellyseerr server/profile selections in memory for later use
-                    JellyNextConfig.savedJellyseerrRadarrServerId = config.JellyseerrRadarrServerId !== null && config.JellyseerrRadarrServerId !== undefined
-                        ? config.JellyseerrRadarrServerId
-                        : null;
-                    JellyNextConfig.savedJellyseerrRadarrProfileId = config.JellyseerrRadarrProfileId !== null && config.JellyseerrRadarrProfileId !== undefined
-                        ? config.JellyseerrRadarrProfileId
-                        : null;
-                    JellyNextConfig.savedJellyseerrSonarrServerId = config.JellyseerrSonarrServerId !== null && config.JellyseerrSonarrServerId !== undefined
-                        ? config.JellyseerrSonarrServerId
-                        : null;
-                    JellyNextConfig.savedJellyseerrSonarrProfileId = config.JellyseerrSonarrProfileId !== null && config.JellyseerrSonarrProfileId !== undefined
-                        ? config.JellyseerrSonarrProfileId
-                        : null;
-                    JellyNextConfig.savedJellyseerrSonarrAnimeProfileId = config.JellyseerrSonarrAnimeProfileId !== null && config.JellyseerrSonarrAnimeProfileId !== undefined
-                        ? config.JellyseerrSonarrAnimeProfileId
-                        : null;
-
-                    // Also set the dropdown values (for initial display before Test Connection is clicked)
-                    if (JellyNextConfig.savedJellyseerrRadarrServerId !== null) {
-                        document.getElementById('JellyseerrRadarrServer').value = JellyNextConfig.savedJellyseerrRadarrServerId;
-                    }
-                    if (JellyNextConfig.savedJellyseerrRadarrProfileId !== null) {
-                        document.getElementById('JellyseerrRadarrProfile').value = JellyNextConfig.savedJellyseerrRadarrProfileId;
-                    }
-                    if (JellyNextConfig.savedJellyseerrSonarrServerId !== null) {
-                        document.getElementById('JellyseerrSonarrServer').value = JellyNextConfig.savedJellyseerrSonarrServerId;
-                    }
-                    if (JellyNextConfig.savedJellyseerrSonarrProfileId !== null) {
-                        document.getElementById('JellyseerrSonarrProfile').value = JellyNextConfig.savedJellyseerrSonarrProfileId;
-                    }
-                    if (JellyNextConfig.savedJellyseerrSonarrAnimeProfileId !== null) {
-                        document.getElementById('JellyseerrSonarrAnimeProfile').value = JellyNextConfig.savedJellyseerrSonarrAnimeProfileId;
-                    }
-                    document.getElementById('RadarrUrl').value = config.RadarrUrl || '';
-                    document.getElementById('RadarrApiKey').value = config.RadarrApiKey || '';
-                    document.getElementById('SonarrUrl').value = config.SonarrUrl || '';
-                    document.getElementById('SonarrApiKey').value = config.SonarrApiKey || '';
-                    document.getElementById('CacheExpirationHours').value = config.CacheExpirationHours || 6;
-                    document.getElementById('PlaybackStopDelaySeconds').value = config.PlaybackStopDelaySeconds !== undefined ? config.PlaybackStopDelaySeconds : 2;
-                    document.getElementById('UseShortDummyVideo').checked = config.UseShortDummyVideo !== false;
-
-                    // Load trending movies configuration
-                    document.getElementById('TrendingMoviesEnabled').checked = config.TrendingMoviesEnabled || false;
-                    document.getElementById('TrendingMoviesLimit').value = config.TrendingMoviesLimit || 50;
-
-                    // Load users for trending dropdown
-                    ApiClient.getUsers().then(function (users) {
-                        var trendingUserSelect = document.getElementById('TrendingMoviesUser');
-                        trendingUserSelect.innerHTML = '<option value="">Select user for Trakt access...</option>';
+            // Load users into dropdown (used by Trakt and Trending tabs)
+            function loadUsers() {
+                return ApiClient.getUsers().then(function (users) {
+                    var userSelector = document.getElementById('UserSelector');
+                    if (userSelector) {
+                        userSelector.innerHTML = '<option value="">Select a user...</option>';
 
                         users.forEach(function (user) {
                             var option = document.createElement('option');
                             option.value = user.Id;
                             option.textContent = user.Name;
-                            if (config.TrendingMoviesUserId && config.TrendingMoviesUserId === user.Id) {
-                                option.selected = true;
-                            }
-                            trendingUserSelect.appendChild(option);
+                            userSelector.appendChild(option);
                         });
-                    });
-
-                    // Show/hide trending options based on enabled state
-                    updateTrendingOptionsVisibility();
-
-                    // If Radarr is configured, show a hint to test connection to see options
-                    if (config.RadarrUrl && config.RadarrApiKey) {
-                        if (config.RadarrQualityProfileId && config.RadarrRootFolderPath) {
-                            var statusDiv = document.getElementById('RadarrConnectionStatus');
-                            statusDiv.style.display = 'block';
-                            statusDiv.innerHTML = '<div class="fieldDescription" style="color: #0088cc;">ℹ Radarr is configured. Click "Test Connection" to modify quality profile or root folder.</div>';
-                        }
                     }
 
-                    // If Sonarr is configured, show a hint to test connection to see options
-                    if (config.SonarrUrl && config.SonarrApiKey) {
-                        if (config.SonarrQualityProfileId && config.SonarrRootFolderPath) {
-                            var sonarrStatusDiv = document.getElementById('SonarrConnectionStatus');
-                            sonarrStatusDiv.style.display = 'block';
-                            sonarrStatusDiv.innerHTML = '<div class="fieldDescription" style="color: #0088cc;">ℹ Sonarr is configured. Click "Test Connection" to modify quality profile or root folder.</div>';
+                    // Also populate trending movies user selector
+                    var trendingUserSelector = document.getElementById('TrendingMoviesUser');
+                    if (trendingUserSelector) {
+                        trendingUserSelector.innerHTML = '<option value="">Select user for Trakt access...</option>';
+
+                        users.forEach(function (user) {
+                            var option = document.createElement('option');
+                            option.value = user.Id;
+                            option.textContent = user.Name;
+                            trendingUserSelector.appendChild(option);
+                        });
+                    }
+                });
+            }
+
+            // Tab loading state
+            var tabsLoaded = {
+                0: false,
+                1: false,
+                2: false,
+                3: false
+            };
+
+            // Map tab index to tab name and file paths
+            var tabConfig = {
+                0: { name: 'general', html: 'tabs/general.html', js: 'tabs/general.js' },
+                1: { name: 'trakt', html: 'tabs/trakt.html', js: 'tabs/trakt.js' },
+                2: { name: 'trending', html: 'tabs/trending.html', js: 'tabs/trending.js' },
+                3: { name: 'downloads', html: 'tabs/downloads.html', js: 'tabs/downloads.js' }
+            };
+
+            // Load tab content and script
+            function loadTabContent(index) {
+                if (tabsLoaded[index]) {
+                    return Promise.resolve();
+                }
+
+                var config = tabConfig[index];
+                if (!config) {
+                    return Promise.reject('Invalid tab index: ' + index);
+                }
+
+                var container = document.querySelector('.tabContent[data-index="' + index + '"]');
+                if (!container) {
+                    return Promise.reject('Tab container not found for index: ' + index);
+                }
+
+                // Fetch HTML content
+                return fetch(ApiClient.getUrl('JellyNext/Config/Tab/' + config.name))
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to load tab HTML: ' + response.statusText);
                         }
+                        return response.text();
+                    })
+                    .then(function(html) {
+                        // Inject HTML into container
+                        container.innerHTML = html;
+
+                        // Load and execute JavaScript
+                        return new Promise(function(resolve, reject) {
+                            var script = document.createElement('script');
+                            script.src = ApiClient.getUrl('JellyNext/Config/Tab/' + config.name + '/js');
+                            script.onload = function() {
+                                // Call tab-specific init function
+                                var initFunctionName = 'init' + config.name.charAt(0).toUpperCase() + config.name.slice(1) + 'Tab';
+                                if (window[initFunctionName]) {
+                                    window[initFunctionName]();
+                                }
+                                tabsLoaded[index] = true;
+                                resolve();
+                            };
+                            script.onerror = function() {
+                                reject(new Error('Failed to load tab script: ' + config.name));
+                            };
+                            document.body.appendChild(script);
+                        });
+                    });
+            }
+
+            // Load all tabs on page load (eager loading)
+            function loadAllTabs() {
+                return Promise.all([
+                    loadTabContent(0),
+                    loadTabContent(1),
+                    loadTabContent(2),
+                    loadTabContent(3)
+                ]);
+            }
+
+            // Page initialization
+            document.getElementById('JellyNextConfigPage').addEventListener('pageshow', function () {
+                Dashboard.showLoadingMsg();
+
+                // Initialize tabs (sets up tab switching)
+                initializeTabs();
+
+                var pluginConfig;
+
+                // Load all tab content, then load data in proper order
+                loadAllTabs().then(function() {
+                    // Load plugin configuration first
+                    return ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId);
+                }).then(function(config) {
+                    // Store config for later use
+                    pluginConfig = config;
+
+                    // Load users into dropdowns (returns a promise)
+                    return loadUsers();
+                }).then(function() {
+                    // Now that users are loaded, populate settings from config
+                    if (window.loadGeneralSettings) {
+                        loadGeneralSettings(pluginConfig);
+                    }
+                    if (window.loadTrendingSettings) {
+                        loadTrendingSettings(pluginConfig);
+                    }
+                    if (window.loadDownloadsConfig) {
+                        loadDownloadsConfig(pluginConfig);
                     }
 
                     Dashboard.hideLoadingMsg();
+                }).catch(function(error) {
+                    console.error('Error loading configuration:', error);
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Failed to load configuration: ' + error.message);
                 });
             });
 
@@ -1708,124 +278,33 @@
                 Dashboard.showLoadingMsg();
 
                 ApiClient.getPluginConfiguration(JellyNextConfig.pluginUniqueId).then(function (config) {
-                    // Save download integration type
-                    var downloadIntegrationRadio = document.querySelector('input[name="DownloadIntegration"]:checked');
-                    if (downloadIntegrationRadio) {
-                        config.DownloadIntegration = parseInt(downloadIntegrationRadio.value);
+                    // Save settings from each tab
+                    if (window.saveGeneralSettings) {
+                        saveGeneralSettings(config);
                     }
-
-                    config.JellyseerrUrl = document.getElementById('JellyseerrUrl').value;
-                    config.JellyseerrApiKey = document.getElementById('JellyseerrApiKey').value;
-
-                    // Save Jellyseerr default config checkboxes
-                    config.UseJellyseerrRadarrDefaults = document.getElementById('UseJellyseerrRadarrDefaults').checked;
-                    config.UseJellyseerrSonarrDefaults = document.getElementById('UseJellyseerrSonarrDefaults').checked;
-
-                    // Save webhook settings
-                    config.WebhookMethod = document.getElementById('WebhookMethod').value;
-                    config.WebhookMovieUrl = document.getElementById('WebhookMovieUrl').value;
-                    config.WebhookShowUrl = document.getElementById('WebhookShowUrl').value;
-                    config.WebhookMoviePayload = document.getElementById('WebhookMoviePayload').value;
-                    config.WebhookShowPayload = document.getElementById('WebhookShowPayload').value;
-
-                    // Save webhook headers from dynamic arrays (filter out empty headers)
-                    config.WebhookMovieHeaders = movieHeadersData
-                        .filter(h => h.name && h.name.trim())
-                        .map(h => ({
-                            Name: h.name,
-                            Value: h.value
-                        }));
-
-                    config.WebhookShowHeaders = showHeadersData
-                        .filter(h => h.name && h.name.trim())
-                        .map(h => ({
-                            Name: h.name,
-                            Value: h.value
-                        }));
-
-                    // Save Jellyseerr server/profile selections (only if not using defaults)
-                    var jellyseerrRadarrServerId = document.getElementById('JellyseerrRadarrServer').value;
-                    var jellyseerrRadarrProfileId = document.getElementById('JellyseerrRadarrProfile').value;
-                    var jellyseerrSonarrServerId = document.getElementById('JellyseerrSonarrServer').value;
-                    var jellyseerrSonarrProfileId = document.getElementById('JellyseerrSonarrProfile').value;
-                    var jellyseerrSonarrAnimeProfileId = document.getElementById('JellyseerrSonarrAnimeProfile').value;
-
-                    config.JellyseerrRadarrServerId = jellyseerrRadarrServerId ? parseInt(jellyseerrRadarrServerId) : null;
-                    config.JellyseerrRadarrProfileId = jellyseerrRadarrProfileId ? parseInt(jellyseerrRadarrProfileId) : null;
-                    config.JellyseerrSonarrServerId = jellyseerrSonarrServerId ? parseInt(jellyseerrSonarrServerId) : null;
-                    config.JellyseerrSonarrProfileId = jellyseerrSonarrProfileId ? parseInt(jellyseerrSonarrProfileId) : null;
-                    config.JellyseerrSonarrAnimeProfileId = jellyseerrSonarrAnimeProfileId ? parseInt(jellyseerrSonarrAnimeProfileId) : null;
-                    config.RadarrUrl = document.getElementById('RadarrUrl').value;
-                    config.RadarrApiKey = document.getElementById('RadarrApiKey').value;
-
-                    // Save Radarr quality profile and root folder if selected
-                    var qualityProfileId = document.getElementById('RadarrQualityProfile').value;
-                    var rootFolderPath = document.getElementById('RadarrRootFolder').value;
-                    if (qualityProfileId) {
-                        config.RadarrQualityProfileId = parseInt(qualityProfileId);
+                    if (window.saveTrendingSettings) {
+                        saveTrendingSettings(config);
                     }
-                    if (rootFolderPath) {
-                        config.RadarrRootFolderPath = rootFolderPath;
+                    if (window.saveDownloadsConfig) {
+                        saveDownloadsConfig(config);
                     }
-
-                    config.SonarrUrl = document.getElementById('SonarrUrl').value;
-                    config.SonarrApiKey = document.getElementById('SonarrApiKey').value;
-
-                    // Save Sonarr quality profile and root folders if selected
-                    var sonarrQualityProfileId = document.getElementById('SonarrQualityProfile').value;
-                    var sonarrRootFolderPath = document.getElementById('SonarrRootFolder').value;
-                    var sonarrAnimeRootFolderPath = document.getElementById('SonarrAnimeRootFolder').value;
-                    if (sonarrQualityProfileId) {
-                        config.SonarrQualityProfileId = parseInt(sonarrQualityProfileId);
-                    }
-                    if (sonarrRootFolderPath) {
-                        config.SonarrRootFolderPath = sonarrRootFolderPath;
-                    }
-                    if (sonarrAnimeRootFolderPath) {
-                        config.SonarrAnimeRootFolderPath = sonarrAnimeRootFolderPath;
-                    }
-
-                    config.CacheExpirationHours = parseInt(document.getElementById('CacheExpirationHours').value);
-                    config.PlaybackStopDelaySeconds = parseInt(document.getElementById('PlaybackStopDelaySeconds').value);
-                    config.UseShortDummyVideo = document.getElementById('UseShortDummyVideo').checked;
-
-                    // Save trending movies configuration
-                    config.TrendingMoviesEnabled = document.getElementById('TrendingMoviesEnabled').checked;
-                    var trendingUserId = document.getElementById('TrendingMoviesUser').value;
-                    if (config.TrendingMoviesEnabled && trendingUserId) {
-                        config.TrendingMoviesUserId = trendingUserId;
-                    }
-                    config.TrendingMoviesLimit = parseInt(document.getElementById('TrendingMoviesLimit').value) || 50;
 
                     // Save plugin configuration
-                    ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config).then(function (result) {
-                        // If a user is selected, save their per-user settings too
-                        if (JellyNextConfig.currentUserGuid) {
-                            var userSettings = {
-                                syncMovieRecommendations: document.getElementById('UserSyncMovieRecommendations').checked,
-                                syncShowRecommendations: document.getElementById('UserSyncShowRecommendations').checked,
-                                syncNextSeasons: document.getElementById('UserSyncNextSeasons').checked,
-                                ignoreCollected: document.getElementById('UserIgnoreCollected').checked,
-                                ignoreWatchlisted: document.getElementById('UserIgnoreWatchlisted').checked,
-                                limitShowsToSeasonOne: document.getElementById('UserLimitShowsToSeasonOne').checked,
-                                movieRecommendationsLimit: parseInt(document.getElementById('UserMovieRecommendationsLimit').value) || 50,
-                                showRecommendationsLimit: parseInt(document.getElementById('UserShowRecommendationsLimit').value) || 50
-                            };
-
-                            return ApiClient.fetch({
-                                type: 'POST',
-                                url: ApiClient.getUrl('JellyNext/Trakt/Users/' + JellyNextConfig.currentUserGuid + '/Settings'),
-                                data: JSON.stringify(userSettings),
-                                contentType: 'application/json'
-                            }).then(function (response) {
-                                return response.json();
-                            }).then(function () {
-                                Dashboard.processPluginConfigurationUpdateResult(result);
-                            });
-                        } else {
-                            Dashboard.processPluginConfigurationUpdateResult(result);
-                        }
-                    });
+                    return ApiClient.updatePluginConfiguration(JellyNextConfig.pluginUniqueId, config);
+                }).then(function (result) {
+                    // If a user is selected in Trakt tab, save their per-user settings too
+                    if (JellyNextConfig.currentUserGuid && window.saveUserTraktSettings) {
+                        return saveUserTraktSettings(JellyNextConfig.currentUserGuid).then(function() {
+                            return result;
+                        });
+                    }
+                    return result;
+                }).then(function(result) {
+                    Dashboard.processPluginConfigurationUpdateResult(result);
+                }).catch(function(error) {
+                    console.error('Error saving configuration:', error);
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Failed to save configuration: ' + error.message);
                 });
 
                 return false;

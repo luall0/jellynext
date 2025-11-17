@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.2.1.0
+
+### Improvements
+
+- **Modular Configuration UI**: Refactored configuration page into maintainable tab-based architecture
+  - Split 1843-line monolithic `configPage.html` into modular components (317-line main shell + 4 tab files)
+  - Each tab isolated: `general.html/js`, `trakt.html/js`, `trending.html/js`, `downloads.html/js` (~40-865 lines each)
+  - New `ConfigController` serves tab resources from embedded resources via REST endpoints
+  - Eager loading strategy ensures all tabs loaded before population
+  - Proper async load order prevents race conditions (load tabs → config → users → populate UI)
+
+### Bug Fixes
+
+- **Configuration save errors**: Fixed JSON deserialization errors when saving with unconfigured Radarr/Sonarr
+  - Changed `RadarrQualityProfileId` and `SonarrQualityProfileId` from `int` to `int?` (nullable)
+  - Added validation in `RadarrService` and `SonarrService` before using profile IDs
+  - Fixed JavaScript to properly handle empty select values (avoid `parseInt("")` → `NaN`)
+- **Race condition in trending settings**: Fixed issue where user selection was lost on page reload
+  - `loadUsers()` now returns promise to ensure dropdown is populated before setting selected value
+  - Prevents accidental overwrite of `TrendingMoviesUserId` with null
+
+### Technical
+
+- Updated CLAUDE.md with configuration page architecture patterns and load order requirements
+
 ## v1.2.0.0
 
 ### Features

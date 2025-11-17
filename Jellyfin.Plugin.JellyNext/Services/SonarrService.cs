@@ -187,12 +187,18 @@ public class SonarrService
                 });
             }
 
+            // Validate configuration
+            if (!config.SonarrQualityProfileId.HasValue)
+            {
+                throw new InvalidOperationException("Sonarr quality profile is not configured");
+            }
+
             // Create series object
             var newSeries = new SonarrSeries
             {
                 TvdbId = tvdbId,
                 Title = title,
-                QualityProfileId = config.SonarrQualityProfileId,
+                QualityProfileId = config.SonarrQualityProfileId.Value,
                 RootFolderPath = rootFolderPath,
                 Monitored = true, // Series monitored, but only specific season is monitored at season level
                 SeasonFolder = true,

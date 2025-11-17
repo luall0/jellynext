@@ -142,13 +142,19 @@ public class RadarrService
                 return existingMovie;
             }
 
+            // Validate configuration
+            if (!config.RadarrQualityProfileId.HasValue)
+            {
+                throw new InvalidOperationException("Radarr quality profile is not configured");
+            }
+
             // Create movie request
             var movieRequest = new RadarrMovie
             {
                 TmdbId = tmdbId,
                 Title = title,
                 Year = year,
-                QualityProfileId = config.RadarrQualityProfileId,
+                QualityProfileId = config.RadarrQualityProfileId.Value,
                 RootFolderPath = config.RadarrRootFolderPath,
                 Monitored = true,
                 AddOptions = new RadarrAddOptions

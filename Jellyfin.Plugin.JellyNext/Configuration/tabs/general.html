@@ -1,0 +1,38 @@
+<!-- Cache Settings -->
+<div class="verticalSection">
+    <h3 class="sectionTitle">Cache Settings</h3>
+    <div class="inputContainer">
+        <label class="inputLabel inputLabelUnfocused" for="CacheExpirationHours">Content Cache Expiration (hours):</label>
+        <input is="emby-input" type="number" id="CacheExpirationHours" name="CacheExpirationHours" min="1" max="168" />
+        <div class="fieldDescription">
+            How long cached content remains valid before requiring a fresh fetch from Trakt (1-168 hours).
+            Cached data is served instantly when browsing virtual libraries, avoiding API rate limits and improving performance.
+            Configure sync schedule in Dashboard → Scheduled Tasks → "Sync Trakt Content".
+        </div>
+    </div>
+</div>
+
+<!-- Playback Settings -->
+<div class="verticalSection">
+    <h3 class="sectionTitle">Playback Settings</h3>
+    <div class="checkboxContainer checkboxContainer-withDescription">
+        <label>
+            <input is="emby-checkbox" type="checkbox" id="UseShortDummyVideo" />
+            <span>Use Short Dummy Video (2 seconds)</span>
+        </label>
+        <div class="fieldDescription checkboxFieldDescription">
+            When enabled, virtual items use a 2-second dummy video that stops playback automatically on clients that don't support API playback stopping.
+            When disabled, uses a 1-hour dummy video (prevents "watched" status but requires manual stop).
+            Default: enabled.
+        </div>
+    </div>
+    <div class="inputContainer">
+        <label class="inputLabel inputLabelUnfocused" for="PlaybackStopDelaySeconds">Playback Stop Delay (seconds):</label>
+        <input is="emby-input" type="number" id="PlaybackStopDelaySeconds" name="PlaybackStopDelaySeconds" min="0" max="30" />
+        <div class="fieldDescription">
+            Delay in seconds before stopping playback of virtual items (0-30 seconds, default: 2).
+            Some clients need time before playback can be stopped reliably.
+            Increase this value if you experience playback issues on certain clients.
+        </div>
+    </div>
+</div>

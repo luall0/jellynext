@@ -114,7 +114,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>
     /// Gets or sets the Radarr Quality Profile ID.
     /// </summary>
-    public int RadarrQualityProfileId { get; set; }
+    public int? RadarrQualityProfileId { get; set; }
 
     /// <summary>
     /// Gets or sets the Radarr Root Folder Path.
@@ -134,7 +134,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>
     /// Gets or sets the Sonarr Quality Profile ID.
     /// </summary>
-    public int SonarrQualityProfileId { get; set; }
+    public int? SonarrQualityProfileId { get; set; }
 
     /// <summary>
     /// Gets or sets the Sonarr Root Folder Path.
