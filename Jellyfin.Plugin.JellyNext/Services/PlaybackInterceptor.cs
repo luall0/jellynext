@@ -9,6 +9,7 @@ using Jellyfin.Plugin.JellyNext.Models.Radarr;
 using Jellyfin.Plugin.JellyNext.Models.Sonarr;
 using Jellyfin.Plugin.JellyNext.Models.Trakt;
 using Jellyfin.Plugin.JellyNext.Services.DownloadProviders;
+using Jellyfin.Plugin.JellyNext.VirtualLibrary;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Entities;
@@ -89,16 +90,68 @@ public class PlaybackInterceptor : IHostedService
 
             _logger.LogInformation("Detected playback attempt for virtual item: {Path}", e.Item.Path);
 
-            // Extract userId from path (for fetching cached content)
+            // Extract userId or "global" from path (for fetching cached content)
             var pathMatch = System.Text.RegularExpressions.Regex.Match(
                 e.Item.Path,
-                @"jellynext-virtual[/\\]([a-f0-9-]+)[/\\]");
+                @"jellynext-virtual[/\\]([^/\\]+)[/\\]([^/\\]+)[/\\]");
 
             Guid contentOwnerId;
-            if (!pathMatch.Success || !Guid.TryParse(pathMatch.Groups[1].Value, out contentOwnerId))
+            if (!pathMatch.Success)
             {
-                _logger.LogWarning("Could not extract user ID from virtual item path: {Path}", e.Item.Path);
+                _logger.LogWarning("Could not parse virtual item path: {Path}", e.Item.Path);
                 contentOwnerId = e.Session.UserId;
+            }
+            else
+            {
+                var userIdOrGlobal = pathMatch.Groups[1].Value;
+                var contentTypeDir = pathMatch.Groups[2].Value;
+
+                // Check if this is global content
+                if (userIdOrGlobal.Equals("global", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Parse the content type to determine which config user ID to use
+                    if (VirtualLibraryContentTypeHelper.TryParseDirectoryName(contentTypeDir, out var contentType))
+                    {
+                        if (VirtualLibraryContentTypeHelper.IsGlobal(contentType))
+                        {
+                            var pluginConfig = Plugin.Instance?.Configuration;
+                            if (pluginConfig != null)
+                            {
+                                // Map global content type to appropriate user ID from config
+                                contentOwnerId = contentType switch
+                                {
+                                    VirtualLibraryContentType.MoviesTrending => pluginConfig.TrendingMoviesUserId,
+                                    _ => e.Session.UserId
+                                };
+
+                                _logger.LogInformation(
+                                    "Global content type {ContentType} - using configured user {UserId}",
+                                    contentType,
+                                    contentOwnerId);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Could not access configuration for global content");
+                                contentOwnerId = e.Session.UserId;
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Content type {ContentType} is not global but path contains 'global'", contentType);
+                            contentOwnerId = e.Session.UserId;
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not parse content type directory: {ContentTypeDir}", contentTypeDir);
+                        contentOwnerId = e.Session.UserId;
+                    }
+                }
+                else if (!Guid.TryParse(userIdOrGlobal, out contentOwnerId))
+                {
+                    _logger.LogWarning("Could not extract user ID from virtual item path: {Path}", e.Item.Path);
+                    contentOwnerId = e.Session.UserId;
+                }
             }
 
             // Get the actual player's user ID (for Jellyseerr requests)

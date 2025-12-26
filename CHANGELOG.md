@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.2.1.1
+
+### Bug Fixes
+
+- **Trending movies downloads**: Fixed download failure when playing trending movies
+  - PlaybackInterceptor now correctly handles global content paths (`jellynext-virtual/global/movies_trending/`)
+  - Detects global content types and uses configured `TrendingMoviesUserId` for cache lookup
+  - Previously failed because path parsing expected per-user GUID, not "global" keyword
+
 ## v1.2.1.0
 
 ### Improvements
