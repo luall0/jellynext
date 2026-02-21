@@ -37,8 +37,9 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IContentProvider, NextSeasonsProvider>();
         serviceCollection.AddSingleton<IContentProvider, TrendingMoviesProvider>();
 
-        // Sync service (must be registered after providers)
+        // Sync services (must be registered after providers)
         serviceCollection.AddSingleton<ContentSyncService>();
+        serviceCollection.AddSingleton<WatchlistSyncService>();
 
         // Virtual library
         serviceCollection.AddSingleton<VirtualLibrary.VirtualLibraryManager>();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Jellyfin.Plugin.JellyNext.Models.Trakt;
 
@@ -71,4 +72,26 @@ public class TraktUser
     /// Gets or sets the number of show recommendations to fetch (1-100).
     /// </summary>
     public int ShowRecommendationsLimit { get; set; } = 50;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to automatically add watchlisted movies to Radarr/Sonarr/Jellyseerr.
+    /// </summary>
+    public bool SyncWatchlistMovies { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to automatically add watchlisted shows to Radarr/Sonarr/Jellyseerr.
+    /// </summary>
+    public bool SyncWatchlistShows { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the set of movie TMDB IDs that have been processed from the watchlist.
+    /// Used to avoid re-adding the same items on subsequent syncs.
+    /// </summary>
+    public HashSet<int> ProcessedWatchlistMovieIds { get; set; } = new HashSet<int>();
+
+    /// <summary>
+    /// Gets or sets the set of show TVDB IDs that have been processed from the watchlist.
+    /// Used to avoid re-adding the same items on subsequent syncs.
+    /// </summary>
+    public HashSet<int> ProcessedWatchlistShowIds { get; set; } = new HashSet<int>();
 }

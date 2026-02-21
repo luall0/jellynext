@@ -131,6 +131,8 @@ function loadUserSettings() {
         document.getElementById('UserSyncMovieRecommendations').checked = settings.syncMovieRecommendations !== false;
         document.getElementById('UserSyncShowRecommendations').checked = settings.syncShowRecommendations !== false;
         document.getElementById('UserSyncNextSeasons').checked = settings.syncNextSeasons !== false;
+        document.getElementById('UserSyncWatchlistMovies').checked = settings.syncWatchlistMovies === true;
+        document.getElementById('UserSyncWatchlistShows').checked = settings.syncWatchlistShows === true;
         document.getElementById('UserIgnoreCollected').checked = settings.ignoreCollected !== false;
         document.getElementById('UserIgnoreWatchlisted').checked = settings.ignoreWatchlisted === true;
         document.getElementById('UserLimitShowsToSeasonOne').checked = settings.limitShowsToSeasonOne !== false;
@@ -177,6 +179,8 @@ function saveUserTraktSettings(userGuid) {
         syncMovieRecommendations: document.getElementById('UserSyncMovieRecommendations').checked,
         syncShowRecommendations: document.getElementById('UserSyncShowRecommendations').checked,
         syncNextSeasons: document.getElementById('UserSyncNextSeasons').checked,
+        syncWatchlistMovies: document.getElementById('UserSyncWatchlistMovies').checked,
+        syncWatchlistShows: document.getElementById('UserSyncWatchlistShows').checked,
         ignoreCollected: document.getElementById('UserIgnoreCollected').checked,
         ignoreWatchlisted: document.getElementById('UserIgnoreWatchlisted').checked,
         limitShowsToSeasonOne: document.getElementById('UserLimitShowsToSeasonOne').checked,

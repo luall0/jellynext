@@ -151,6 +151,8 @@ public class TraktController : ControllerBase
             syncMovieRecommendations = traktUser.SyncMovieRecommendations,
             syncShowRecommendations = traktUser.SyncShowRecommendations,
             syncNextSeasons = traktUser.SyncNextSeasons,
+            syncWatchlistMovies = traktUser.SyncWatchlistMovies,
+            syncWatchlistShows = traktUser.SyncWatchlistShows,
             ignoreCollected = traktUser.IgnoreCollected,
             ignoreWatchlisted = traktUser.IgnoreWatchlisted,
             limitShowsToSeasonOne = traktUser.LimitShowsToSeasonOne,
@@ -180,6 +182,8 @@ public class TraktController : ControllerBase
         traktUser.SyncMovieRecommendations = settings.SyncMovieRecommendations;
         traktUser.SyncShowRecommendations = settings.SyncShowRecommendations;
         traktUser.SyncNextSeasons = settings.SyncNextSeasons;
+        traktUser.SyncWatchlistMovies = settings.SyncWatchlistMovies;
+        traktUser.SyncWatchlistShows = settings.SyncWatchlistShows;
         traktUser.IgnoreCollected = settings.IgnoreCollected;
         traktUser.IgnoreWatchlisted = settings.IgnoreWatchlisted;
         traktUser.LimitShowsToSeasonOne = settings.LimitShowsToSeasonOne;
@@ -237,5 +241,15 @@ public class TraktController : ControllerBase
         /// Gets or sets the number of show recommendations to fetch (1-100).
         /// </summary>
         public int ShowRecommendationsLimit { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to automatically add watchlisted movies to download system.
+        /// </summary>
+        public bool SyncWatchlistMovies { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to automatically add watchlisted shows to download system.
+        /// </summary>
+        public bool SyncWatchlistShows { get; set; }
     }
 }

@@ -45,7 +45,7 @@ Jellyfin.Plugin.JellyNext/
 ├── Providers/              # Content provider implementations (IContentProvider)
 ├── Resources/              # Embedded resources (dummy.mp4)
 ├── ScheduledTasks/         # Background tasks (ContentSyncScheduledTask.cs)
-├── Services/               # Business logic (TraktApi, ContentSync, Radarr/Sonarr, Jellyseerr, etc.)
+├── Services/                   # Business logic (TraktApi, ContentSync, WatchlistSync, Radarr/Sonarr, Jellyseerr, etc.)
 │   └── DownloadProviders/  # IDownloadProvider, NativeDownloadProvider, JellyseerrDownloadProvider, WebhookDownloadProvider
 ├── VirtualLibrary/         # Virtual library system (Manager, Creator, ContentType)
 ├── Plugin.cs               # Main entry point
@@ -57,8 +57,9 @@ Jellyfin.Plugin.JellyNext/
 - **Virtual Libraries**: Per-user .strm stub files (`jellynext-virtual/[userId]/[content-type]/`) + global content (`jellynext-virtual/global/[content-type]/`)
 - **Download Providers** (`IDownloadProvider`): Pluggable download backends (NativeDownloadProvider for direct Radarr/Sonarr, JellyseerrDownloadProvider for Jellyseerr API, WebhookDownloadProvider for custom HTTP webhooks)
 - **Playback Interception**: Detects virtual item playback, triggers downloads via selected provider
+- **Watchlist Sync**: Automatically adds watchlisted movies/shows from Trakt to download systems (Radarr/Sonarr/Jellyseerr)
 - **OAuth**: Per-user Trakt tokens with auto-refresh (stored in `PluginConfiguration.TraktUsers[]`)
-- **Sync System**: `ContentSyncScheduledTask` + `StartupSyncService` → cache → .strm files → library scan
+- **Sync System**: `ContentSyncScheduledTask` + `WatchlistSyncScheduledTask` + `StartupSyncService` → cache → .strm files → library scan
 
 ### Architectural Layers
 ```
@@ -94,10 +95,11 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 - `ContentCacheService.cs`: In-memory cache for content items (per-user, per-provider, 6hr expiration)
 - `ShowsCacheService.cs`: **Global season-level cache** + **per-user watch progress tracking**. Supports full sync (first run via `/sync/watched/shows`) and incremental sync (subsequent runs via `/sync/history/shows` with timestamps). Automatically handles ended vs ongoing shows, caching all seasons for ended shows and only complete seasons for ongoing shows. Tracks last sync timestamp in-memory for efficient delta syncing.
 - `ContentSyncService.cs`: Sync orchestrator (iterates users/providers, updates cache/virtual library)
+- `WatchlistSyncService.cs`: Watchlist sync orchestrator (fetches Trakt watchlists, filters against local library, triggers downloads via DownloadProviderFactory)
 - `JellyseerrService.cs`: Jellyseerr API client (user import/management, movie/TV requests, server/profile retrieval)
 - `RadarrService.cs`: Radarr API client (movie search/add) - native integration only
 - `SonarrService.cs`: Sonarr API client (series search/add, per-season monitoring, anime detection) - native integration only
-- `LocalLibraryService.cs`: Jellyfin library queries (find series by TVDB ID, exclude virtual items)
+- `LocalLibraryService.cs`: Jellyfin library queries (find series by TVDB ID, check movie existence by TMDB ID, exclude virtual items)
 - `PlaybackInterceptor.cs`: IHostedService detecting virtual item playback, uses DownloadProviderFactory to route requests
 - `DownloadProviderFactory.cs`: Factory selecting NativeDownloadProvider, JellyseerrDownloadProvider, or WebhookDownloadProvider based on config
 
@@ -115,6 +117,7 @@ Plugin Entry → API Controllers → Services → Providers → Virtual Library 
 
 **Jellyfin Integration**:
 - `ScheduledTasks/ContentSyncScheduledTask.cs`: IScheduledTask (6hr interval, calls ContentSyncService, triggers library scan)
+- `ScheduledTasks/WatchlistSyncScheduledTask.cs`: IScheduledTask (1hr interval, calls WatchlistSyncService, auto-adds watchlisted items to download systems)
 
 **Configuration**:
 - `Configuration/PluginConfiguration.cs`: Persisted settings (Radarr/Sonarr config, TraktUsers[], cache expiration). Profile IDs are nullable `int?` to support optional configs.
@@ -183,7 +186,8 @@ Background: Plugin.PollingTasks[userGuid] = TraktApi.PollForTokenAsync()
 
 ### Per-User Architecture
 - Each user has own Trakt OAuth token (stored in `PluginConfiguration.TraktUsers[]`)
-- Per-user sync settings: `SyncMovieRecommendations`, `SyncShowRecommendations`, `SyncNextSeasons`, `IgnoreCollected`, `IgnoreWatchlisted`, `LimitShowsToSeasonOne`, `MovieRecommendationsLimit`, `ShowRecommendationsLimit`, `LastHistorySyncTimestamp` (all in `TraktUser` model)
+- Per-user sync settings: `SyncMovieRecommendations`, `SyncShowRecommendations`, `SyncNextSeasons`, `SyncWatchlistMovies`, `SyncWatchlistShows`, `IgnoreCollected`, `IgnoreWatchlisted`, `LimitShowsToSeasonOne`, `MovieRecommendationsLimit`, `ShowRecommendationsLimit`, `LastHistorySyncTimestamp` (all in `TraktUser` model)
+- Watchlist tracking: `ProcessedWatchlistMovieIds` (TMDB IDs), `ProcessedWatchlistShowIds` (TVDB IDs) - persisted to avoid re-adding same items
 - Recommendation limits: User-configurable 1-100 (default: 50), validated with `Math.Clamp()` on save
 - Virtual libraries filtered by userId extracted from path
 - Access via `UserHelper.GetTraktUser(userGuid)`
@@ -238,6 +242,29 @@ Implement `IContentProvider` + register in `PluginServiceRegistrator` → automa
 - **Cache-only reads**: Retrieves watched progress + season metadata entirely from ShowsCacheService (no duplicate API calls)
 - **Dynamic fetching**: If next season not in cache for ongoing shows, fetches latest from Trakt API via `GetShowSeasons()` and checks season count
 - **Library deduplication**: Uses LocalLibraryService to exclude shows already in Jellyfin library (TVDB ID matching)
+
+### Watchlist Sync (Auto-Download)
+- **Purpose**: Automatically adds watchlisted movies/shows from Trakt to download systems (Radarr/Sonarr/Jellyseerr)
+- **Per-user setting**: Controlled by `SyncWatchlistMovies` and `SyncWatchlistShows` flags in `TraktUser`
+- **Architecture**:
+  - `WatchlistSyncService`: Orchestrates watchlist fetching, library deduplication, and download triggering
+  - `WatchlistSyncScheduledTask`: IScheduledTask running every 1 hour (more frequent than content sync due to dynamic watchlist changes)
+  - Uses `DownloadProviderFactory` for routing to Native/Jellyseerr/Webhook modes (same as playback interception)
+- **Workflow**:
+  1. Fetch movies via `TraktApi.GetMovieWatchlist()` and shows via `TraktApi.GetShowWatchlist()`
+  2. Filter out items already in local library (`LocalLibraryService.DoesMovieExist()` / `FindSeriesByTvdbId()`)
+  3. Filter out items already processed (`ProcessedWatchlistMovieIds` / `ProcessedWatchlistShowIds` HashSets)
+  4. Trigger download via appropriate provider (`IDownloadProvider.RequestMovieAsync()` / `RequestShowAsync()`)
+  5. Add to processed IDs to prevent re-adding on subsequent syncs
+  6. Save configuration to persist processed IDs
+- **Show handling**: Adds Season 1 by default (Trakt watchlist doesn't specify specific seasons)
+- **State tracking**: 
+  - `ProcessedWatchlistMovieIds`: HashSet<int> of TMDB IDs (persisted in config)
+  - `ProcessedWatchlistShowIds`: HashSet<int> of TVDB IDs (persisted in config)
+  - Reset manually by removing IDs from config if you want to re-trigger downloads
+- **API endpoints**: Uses `/sync/watchlist/movies` and `/sync/watchlist/shows` with `extended=full` for genre metadata
+- **Throttling**: 1 second delay between downloads to avoid overwhelming download systems
+- **Error handling**: Individual item failures logged, don't stop entire sync process
 
 ### Shows Cache (Season-Level)
 - **Purpose**: Hybrid caching system with global show/season metadata + per-user watch progress tracking
