@@ -58,6 +58,7 @@ Features:
 
 ### ⬇️ Intelligent Download System
 - **One-Click Downloads**: Click "Play" on any virtual library item to trigger download
+- **Watchlist Sync**: Automatically add Trakt watchlisted movies/shows to your download system (Radarr/Sonarr/Jellyseerr)
 - **Three Integration Modes**:
   - **Native**: Direct Radarr/Sonarr API integration (default)
   - **Jellyseerr**: Route all requests through Jellyseerr for centralized management and approval workflows
@@ -157,6 +158,10 @@ After authorization, configure what to sync for each user:
 - ☑️ **Sync Movie Recommendations**: Enable Trakt Movie Recommendations library
 - ☑️ **Sync Show Recommendations**: Enable Trakt Show Recommendations library
 - ☑️ **Sync Next Seasons**: Enable Trakt Next Seasons library
+
+**Watchlist Sync Options:**
+- ☐ **Sync Watchlist Movies**: Automatically add watchlisted movies to your download system
+- ☐ **Sync Watchlist Shows**: Automatically add watchlisted shows to your download system
 
 **Recommendation Limits:**
 - **Movie Recommendations Limit**: Number of movie recommendations to fetch (1-100, default: 50)
@@ -375,6 +380,21 @@ After setup, you'll see three new libraries per user:
    - Shows only the immediate next unwatched season
    - Automatically updates as you progress through series
    - Uses smart caching to reduce API calls for ended/canceled shows
+
+### Watchlist Sync (Auto-Download)
+
+When enabled, JellyNext automatically monitors your Trakt watchlist and adds items to your download system:
+
+- **How it works**: Every hour, the plugin checks your Trakt watchlist for new movies and shows. New items are automatically sent to your configured download system (Radarr/Sonarr, Jellyseerr, or Webhook).
+- **Library deduplication**: Items already in your Jellyfin library are skipped.
+- **Processed tracking**: Each item is only sent once. Previously processed items are tracked to avoid duplicates across syncs.
+- **TV shows**: Watchlisted shows are added with Season 1 by default (Trakt watchlist doesn't specify seasons).
+- **Anime support**: Anime shows are detected via Trakt genres and routed to the appropriate profile/folder.
+- **Per-user**: Each user controls their own watchlist sync independently via the Trakt user settings.
+
+**To enable**: Go to **Dashboard → Plugins → JellyNext → Trakt tab**, select a user, and check **"Sync Watchlist Movies"** and/or **"Sync Watchlist Shows"**.
+
+**Note**: Watchlist sync requires a download integration to be configured (Native, Jellyseerr, or Webhook).
 
 ### Downloading Content
 
@@ -741,7 +761,7 @@ Contributions are welcome! Please:
 A: No, JellyNext works with free Trakt accounts.
 
 **Q: Will this download content automatically?**
-A: No, downloads are triggered only when you click "Play" on a virtual library item. It's a manual one-click process.
+A: By default, downloads are triggered only when you click "Play" on a virtual library item (one-click). However, you can enable **Watchlist Sync** to automatically add Trakt watchlisted items to your download system.
 
 **Q: Can I use this without Radarr/Sonarr/Jellyseerr?**
 A: Yes, you can still use the virtual libraries to browse recommendations. Downloads just won't work.
@@ -783,6 +803,9 @@ A: Yes, via per-user settings:
 - Enable/disable movie recommendations, show recommendations, or next seasons
 - Filter out collected or watchlisted items
 - Limit show recommendations to season 1 only
+
+**Q: How does Watchlist Sync work?**
+A: When enabled, JellyNext checks your Trakt watchlist every hour and automatically adds new items to your configured download system (Radarr/Sonarr, Jellyseerr, or Webhook). Items already in your Jellyfin library or previously processed are skipped. Enable it per-user in the Trakt user settings.
 
 **Q: Does this use my Jellyfin API key?**
 A: No, it uses Trakt's OAuth system. Each user authorizes the plugin via Trakt's website.
