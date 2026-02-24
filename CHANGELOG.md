@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.3.0.0
+
+### Features
+
+- **Watchlist Sync**: Automatically add Trakt watchlisted items to download systems (Radarr/Sonarr/Jellyseerr)
+  - New per-user settings: `SyncWatchlistMovies` and `SyncWatchlistShows` toggles in Trakt user configuration
+  - Fetches movies via `/sync/watchlist/movies` and shows via `/sync/watchlist/shows` with `extended=full` for genre metadata
+  - Filters out items already in local Jellyfin library and previously processed items
+  - Routes downloads through existing `DownloadProviderFactory` (supports Native, Jellyseerr, and Webhook modes)
+  - Shows default to Season 1 download (Trakt watchlist doesn't specify seasons)
+  - 1-second throttle between downloads to avoid overwhelming download systems
+  - Individual item failures logged without stopping the sync process
+
+- **Watchlist Sync Scheduled Task**: Background task running every 1 hour
+  - More frequent than content sync (6hr) to respond quickly to watchlist changes
+  - Also triggered on startup via `StartupSyncService`
+
+### Improvements
+
+- **State Tracking**: Persistent tracking of processed watchlist items to prevent re-adding
+  - `ProcessedWatchlistMovieIds` (TMDB IDs) and `ProcessedWatchlistShowIds` (TVDB IDs) persisted in configuration
+  - Reset manually by clearing IDs from config to re-trigger downloads
+
+- **Local Library Deduplication**: New `DoesMovieExist()` method in `LocalLibraryService` to check movie existence by TMDB ID (excludes virtual items)
+
+- **Trakt API**: New watchlist endpoints
+  - `GetMovieWatchlist()`: Fetch user's movie watchlist
+  - `GetShowWatchlist()`: Fetch user's show watchlist
+
+- **Configuration UI**: Added watchlist sync toggles to Trakt user settings tab
+
+### Acknowledgments
+
+- Thanks to [@medallyon](https://github.com/medallyon) for implementing the watchlist sync feature
+
 ## v1.2.1.1
 
 ### Bug Fixes

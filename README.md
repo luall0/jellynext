@@ -808,6 +808,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 - **[jellyfin-plugin-trakt](https://github.com/jellyfin/jellyfin-plugin-trakt)**: OAuth implementation reference
 - **[Jellyseerr](https://github.com/Fallenbagel/jellyseerr)**: Request management system
 - **[Radarr](https://radarr.video)** & **[Sonarr](https://sonarr.tv)**: Automated media management
+- **[@medallyon](https://github.com/medallyon)**: Watchlist sync feature (v1.3.0)
 
 ---
 
