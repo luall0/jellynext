@@ -50,6 +50,30 @@ public class LocalLibraryService
     }
 
     /// <summary>
+    /// Finds a movie in the local library by TMDB ID.
+    /// </summary>
+    /// <param name="tmdbId">The TMDB ID.</param>
+    /// <returns>True if the movie exists in the library, false otherwise.</returns>
+    public bool DoesMovieExist(int tmdbId)
+    {
+        var tmdbIdString = tmdbId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        var allItems = _libraryManager.GetItemList(new InternalItemsQuery
+        {
+            IncludeItemTypes = new[] { BaseItemKind.Movie },
+            HasAnyProviderId = new Dictionary<string, string>
+            {
+                { MetadataProvider.Tmdb.ToString(), tmdbIdString }
+            },
+            Recursive = true
+        });
+
+        return allItems
+            .Where(m => !m.Path?.Contains("jellynext-virtual", StringComparison.OrdinalIgnoreCase) ?? true)
+            .Any();
+    }
+
+    /// <summary>
     /// Gets the season numbers that exist locally for a series.
     /// </summary>
     /// <param name="series">The series.</param>

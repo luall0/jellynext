@@ -429,6 +429,64 @@ public class TraktApi
     }
 
     /// <summary>
+    /// Gets the user's movie watchlist.
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration.</param>
+    /// <returns>List of watchlisted movies.</returns>
+    public async Task<TraktMovie[]> GetMovieWatchlist(TraktUser traktUser)
+    {
+        using var httpClient = await CreateTraktClient(traktUser);
+        var response = await httpClient.GetAsync("/sync/watchlist/movies?extended=full");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError(
+                "Failed to get movie watchlist: Status={Status}, Content={Content}",
+                response.StatusCode,
+                errorContent);
+            return Array.Empty<TraktMovie>();
+        }
+
+        var watchlistItems = await response.Content.ReadFromJsonAsync<TraktWatchlistMovieItem[]>(_jsonOptions);
+        if (watchlistItems == null)
+        {
+            return Array.Empty<TraktMovie>();
+        }
+
+        return watchlistItems.Select(item => item.Movie).ToArray();
+    }
+
+    /// <summary>
+    /// Gets the user's show watchlist.
+    /// </summary>
+    /// <param name="traktUser">The Trakt user configuration.</param>
+    /// <returns>List of watchlisted shows.</returns>
+    public async Task<TraktShow[]> GetShowWatchlist(TraktUser traktUser)
+    {
+        using var httpClient = await CreateTraktClient(traktUser);
+        var response = await httpClient.GetAsync("/sync/watchlist/shows?extended=full");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError(
+                "Failed to get show watchlist: Status={Status}, Content={Content}",
+                response.StatusCode,
+                errorContent);
+            return Array.Empty<TraktShow>();
+        }
+
+        var watchlistItems = await response.Content.ReadFromJsonAsync<TraktWatchlistShowItem[]>(_jsonOptions);
+        if (watchlistItems == null)
+        {
+            return Array.Empty<TraktShow>();
+        }
+
+        return watchlistItems.Select(item => item.Show).ToArray();
+    }
+
+    /// <summary>
     /// Gets watch history for shows with automatic pagination and date filtering.
     /// Fetches all pages automatically until no more results are available.
     /// </summary>
